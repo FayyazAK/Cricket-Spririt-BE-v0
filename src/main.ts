@@ -11,8 +11,11 @@ import {
 import { Logger } from 'winston';
 import helmet, { type HelmetOptions } from 'helmet';
 import type { RequestHandler } from 'express';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 type HelmetMiddlewareFactory = (
   options?: Readonly<HelmetOptions>,
@@ -21,9 +24,18 @@ type HelmetMiddlewareFactory = (
 const createHelmetMiddleware: HelmetMiddlewareFactory = helmet;
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
   app.setGlobalPrefix('api');
+
+  // Serve static files for uploads
+  const config = app.get(ConfigService);
+  const uploadDir = config.get('upload.dir') || './uploads';
+  app.useStaticAssets(join(process.cwd(), uploadDir), {
+    prefix: '/uploads',
+  });
 
   app.enableVersioning({
     type: VersioningType.URI,
@@ -42,8 +54,42 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Swagger/OpenAPI Documentation
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('Cricket Spirit API')
+    .setDescription('Complete API documentation for Cricket Spirit Backend - Cricket Scoring Application')
+    .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'JWT-auth', // This name here is important for matching up with @ApiBearerAuth() in your controller!
+    )
+    .addTag('Authentication', 'User authentication and authorization endpoints')
+    .addTag('Players', 'Player management endpoints')
+    .addTag('Addresses', 'Address management and filtering endpoints')
+    .addTag('Bowling Types', 'Bowling types endpoints')
+    .addTag('Clubs', 'Club management endpoints')
+    .addTag('Teams', 'Team management endpoints')
+    .addTag('Tournaments', 'Tournament management endpoints')
+    .addTag('Matches', 'Match management endpoints')
+    .addTag('Scoring', 'Live scoring endpoints')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true, // Keeps the authorization token after page refresh
+    },
+  });
+
   setupGracefulShutdown(app);
-  const config = app.get(ConfigService);
   const port = Number(config.get('port')) || 3000;
   await app.listen(port);
 
@@ -58,6 +104,9 @@ async function bootstrap() {
     context: 'Bootstrap',
   });
   logger.info(`Health check: http://localhost:${port}/api/v1/health`, {
+    context: 'Bootstrap',
+  });
+  logger.info(`Swagger docs: http://localhost:${port}/api/docs`, {
     context: 'Bootstrap',
   });
 }

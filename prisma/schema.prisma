@@ -1,23 +1,528 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
-  // output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum PlayerType {
+  BATSMAN
+  BOWLER
+  ALL_ROUNDER
+}
+
+enum Hand {
+  LEFT
+  RIGHT
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum TournamentStatus {
+  DRAFT
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum MatchFormat {
+  T20
+  ODI
+  TEST
+  CUSTOM
+}
+
+enum BallType {
+  LEATHER
+  TENNIS_TAPE
+}
+
+enum MatchStatus {
+  SCHEDULED
+  TOSS
+  IN_PROGRESS
+  DELAYED
+  BREAK
+  ABANDONED
+  COMPLETED
+}
+
+enum TossDecision {
+  BAT
+  FIELD
+}
+
+enum WicketType {
+  NONE
+  BOWLED
+  CAUGHT
+  STUMPED
+  RUN_OUT
+  LBW
+  HIT_WICKET
+  RETIRED_OUT
+}
+
+enum PlayerRole {
+  PLAYER
+  CAPTAIN
+  VICE_CAPTAIN
+}
+
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
 model User {
-id Int @id @default(autoincrement())
-email String @unique
-name String
-password String
-createdAt DateTime @default(now())
-updatedAt DateTime @updatedAt
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  name                  String
+  password              String
+  role                  UserRole  @default(USER)
+  isEmailVerified       Boolean   @default(false)
+  emailVerificationToken String?  @unique
+  passwordResetToken    String?   @unique
+  passwordResetExpires  DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  // Relations
+  player                Player?
+  clubs                 Club[]    @relation("ClubOwner")
+  tournaments           Tournament[] @relation("TournamentCreator")
+  createdMatches        Match[]    @relation("MatchCreator")
+  scoredMatches         Match[]    @relation("MatchScorer")
+
+  @@map("users")
+}
+
+// ============================================
+// ADDRESS
+// ============================================
+
+model Address {
+  id          String   @id @default(uuid())
+  street      String?
+  townSuburb  String?
+  city        String
+  state       String
+  country     String
+  postalCode  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  players     Player[]
+  clubs       Club[]
+
+  @@map("addresses")
+}
+
+// ============================================
+// PLAYER
+// ============================================
+
+model Player {
+  id            String      @id @default(uuid())
+  userId        String      @unique
+  firstName     String
+  lastName      String
+  gender        Gender      @default(MALE)
+  dateOfBirth   DateTime
+  profilePicture String?
+  playerType    PlayerType
+  isWicketKeeper Boolean    @default(false)
+  batHand       Hand
+  bowlHand      Hand?
+  addressId     String
+  isActive      Boolean     @default(true)
+  deletedAt     DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address       Address     @relation(fields: [addressId], references: [id])
+  bowlingTypes  PlayerBowlingType[]
+  teamMemberships PlayerTeam[]
+  matchPlayers  MatchPlayer[]
+  bowledOvers   Over[]
+  battedBalls   Ball[]      @relation("Batsman")
+  nonStrikerBalls Ball[]    @relation("NonStriker")
+  bowledBalls   Ball[]      @relation("Bowler")
+  wicketBalls  Ball[]      @relation("WicketPlayer")
+  dismissedBalls Ball[]    @relation("DismissedBatsman")
+
+  @@map("players")
+}
+
+model BowlingType {
+  id          String   @id @default(uuid())
+  shortName   String   @unique
+  fullName    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  players     PlayerBowlingType[]
+
+  @@map("bowling_types")
+}
+
+model PlayerBowlingType {
+  id            String        @id @default(uuid())
+  playerId      String
+  bowlingTypeId String
+  createdAt     DateTime      @default(now())
+
+  // Relations
+  player        Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  bowlingType   BowlingType   @relation(fields: [bowlingTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, bowlingTypeId])
+  @@map("player_bowling_types")
+}
+
+// ============================================
+// CLUB & TEAM
+// ============================================
+
+model Club {
+  id              String   @id @default(uuid())
+  name            String
+  profilePicture  String?
+  bio             String?  @db.Text
+  establishedDate DateTime?
+  addressId       String
+  ownerId         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  address         Address  @relation(fields: [addressId], references: [id])
+  owner           User     @relation("ClubOwner", fields: [ownerId], references: [id])
+  teams           Team[]
+
+  @@map("clubs")
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  logo        String?
+  description String?  @db.Text
+  clubId      String
+  createdAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  club        Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  players     PlayerTeam[]
+  tournamentTeams TournamentTeam[]
+  team1Matches Match[] @relation("Team1")
+  team2Matches Match[] @relation("Team2")
+  tossWinnerMatches Match[] @relation("TossWinner")
+  winningTeamMatches MatchResult[] @relation("WinningTeam")
+  pointsTableEntries PointsTableEntry[]
+  battingOvers Over[] @relation("BattingTeam")
+  fieldingOvers Over[] @relation("FieldingTeam")
+  matchInvitations MatchInvitation[]
+  matchPlayers MatchPlayer[]
+
+  @@map("teams")
+}
+
+model PlayerTeam {
+  id                  String            @id @default(uuid())
+  playerId            String
+  teamId              String
+  status              InvitationStatus  @default(PENDING)
+  invitedAt           DateTime          @default(now())
+  invitationExpiresAt DateTime
+  respondedAt         DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  // Relations
+  player              Player            @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team                Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, teamId])
+  @@map("player_teams")
+}
+
+// ============================================
+// TOURNAMENT
+// ============================================
+
+model Tournament {
+  id              String            @id @default(uuid())
+  name            String
+  coverPicture    String?
+  profilePicture  String?
+  format          MatchFormat
+  customOvers     Int?
+  creatorId       String
+  startDate       DateTime?
+  endDate         DateTime?
+  status          TournamentStatus  @default(DRAFT)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  creator         User              @relation("TournamentCreator", fields: [creatorId], references: [id])
+  teams           TournamentTeam[]
+  matches         Match[]
+  pointsTable     PointsTable?
+
+  @@map("tournaments")
+}
+
+model TournamentTeam {
+  id                  String            @id @default(uuid())
+  tournamentId        String
+  teamId              String
+  status              InvitationStatus  @default(PENDING)
+  invitedAt           DateTime          @default(now())
+  invitationExpiresAt   DateTime
+  respondedAt          DateTime?
+  withdrawnAt         DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  // Relations
+  tournament          Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  team                Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, teamId])
+  @@map("tournament_teams")
+}
+
+model PointsTable {
+  id          String   @id @default(uuid())
+  tournamentId String  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  tournament  Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  entries     PointsTableEntry[]
+
+  @@map("points_tables")
+}
+
+model PointsTableEntry {
+  id              String   @id @default(uuid())
+  pointsTableId   String
+  teamId          String
+  matchesPlayed   Int      @default(0)
+  matchesWon      Int      @default(0)
+  matchesLost     Int      @default(0)
+  matchesTied     Int      @default(0)
+  points          Int      @default(0)
+  netRunRate      Decimal  @default(0) @db.Decimal(10, 4)
+  runsScored      Int      @default(0)
+  runsConceded    Int      @default(0)
+  oversFaced      Decimal  @default(0) @db.Decimal(10, 2)
+  oversBowled     Decimal  @default(0) @db.Decimal(10, 2)
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  pointsTable     PointsTable @relation(fields: [pointsTableId], references: [id], onDelete: Cascade)
+  team            Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([pointsTableId, teamId])
+  @@map("points_table_entries")
+}
+
+// ============================================
+// MATCH
+// ============================================
+
+model Match {
+  id              String        @id @default(uuid())
+  tournamentId    String?
+  team1Id         String
+  team2Id         String
+  overs           Int
+  ballType        BallType
+  format          MatchFormat
+  customOvers     Int?
+  status          MatchStatus   @default(SCHEDULED)
+  scheduledDate   DateTime
+  startedAt       DateTime?
+  completedAt     DateTime?
+  tossWinnerId    String?
+  tossDecision    TossDecision?
+  scorerId        String?
+  creatorId       String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  tournament      Tournament?   @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+  team1           Team          @relation("Team1", fields: [team1Id], references: [id])
+  team2           Team          @relation("Team2", fields: [team2Id], references: [id])
+  tossWinner      Team?         @relation("TossWinner", fields: [tossWinnerId], references: [id])
+  scorer          User?         @relation("MatchScorer", fields: [scorerId], references: [id])
+  creator         User          @relation("MatchCreator", fields: [creatorId], references: [id])
+  invitations     MatchInvitation[]
+  players         MatchPlayer[]
+  matchOvers      Over[]
+  result          MatchResult?
+
+  @@map("matches")
+}
+
+model MatchInvitation {
+  id                  String            @id @default(uuid())
+  matchId             String
+  teamId              String
+  status              InvitationStatus  @default(PENDING)
+  invitedAt           DateTime          @default(now())
+  invitationExpiresAt DateTime
+  respondedAt         DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  // Relations
+  match               Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  team                Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, teamId])
+  @@map("match_invitations")
+}
+
+model MatchPlayer {
+  id          String      @id @default(uuid())
+  matchId     String
+  playerId    String
+  teamId      String
+  role        PlayerRole?
+  createdAt   DateTime    @default(now())
+
+  // Relations
+  match       Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player      Player      @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team        Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId, teamId])
+  @@map("match_players")
+}
+
+// ============================================
+// SCORING
+// ============================================
+
+model Over {
+  id              String   @id @default(uuid())
+  matchId         String
+  inningNumber    Int
+  overNumber      Int
+  bowlerId        String
+  battingTeamId   String
+  fieldingTeamId  String
+  runs            Int      @default(0)
+  extras          Int      @default(0)
+  wickets         Int      @default(0)
+  isMaiden        Boolean  @default(false)
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  bowler          Player   @relation(fields: [bowlerId], references: [id])
+  battingTeam     Team     @relation("BattingTeam", fields: [battingTeamId], references: [id])
+  fieldingTeam    Team     @relation("FieldingTeam", fields: [fieldingTeamId], references: [id])
+  balls           Ball[]
+
+  @@map("overs")
+}
+
+model Ball {
+  id                String      @id @default(uuid())
+  overId             String
+  ballNumber         Int
+  batsmanId          String?
+  nonStrikerId       String?
+  bowlerId           String
+  runs               Int         @default(0)
+  isWide             Boolean     @default(false)
+  wideRuns           Int         @default(0)
+  isNoBall           Boolean     @default(false)
+  noBallRuns         Int         @default(0)
+  isBye              Boolean     @default(false)
+  byeRuns            Int         @default(0)
+  isLegBye           Boolean     @default(false)
+  legByeRuns         Int         @default(0)
+  wicketType         WicketType  @default(NONE)
+  wicketPlayerId     String?
+  dismissedBatsmanId String?
+  isDotBall          Boolean     @default(false)
+  timestamp          DateTime    @default(now())
+  createdAt          DateTime    @default(now())
+
+  // Relations
+  over               Over        @relation(fields: [overId], references: [id], onDelete: Cascade)
+  batsman            Player?     @relation("Batsman", fields: [batsmanId], references: [id])
+  nonStriker         Player?     @relation("NonStriker", fields: [nonStrikerId], references: [id])
+  bowler             Player      @relation("Bowler", fields: [bowlerId], references: [id])
+  wicketPlayer       Player?     @relation("WicketPlayer", fields: [wicketPlayerId], references: [id])
+  dismissedBatsman   Player?     @relation("DismissedBatsman", fields: [dismissedBatsmanId], references: [id])
+
+  @@map("balls")
+}
+
+model MatchResult {
+  id                String   @id @default(uuid())
+  matchId           String   @unique
+  winningTeamId     String?
+  isTie             Boolean  @default(false)
+  isAbandoned       Boolean  @default(false)
+  team1Score        Int
+  team1Wickets      Int
+  team1Overs        Decimal  @db.Decimal(10, 2)
+  team2Score        Int
+  team2Wickets      Int
+  team2Overs        Decimal  @db.Decimal(10, 2)
+  resultDescription String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  match             Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  winningTeam       Team?    @relation("WinningTeam", fields: [winningTeamId], references: [id])
+
+  @@map("match_results")
 }

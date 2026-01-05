@@ -1,0 +1,120 @@
+import {
+  Controller,
+  Post,
+  Get,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { MatchService } from './match.service';
+import { CreateMatchDto } from './dtos/create-match.dto';
+import { UpdateMatchDto } from './dtos/update-match.dto';
+import { TossDto } from './dtos/toss.dto';
+import { AssignScorerDto } from './dtos/assign-scorer.dto';
+import { MatchResponseDto } from './dtos/match-response.dto';
+import { Serialize } from '../common/interceptors/response.interceptor';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
+@Controller('matches')
+export class MatchController {
+  constructor(private readonly matchService: MatchService) {}
+
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @Serialize(MatchResponseDto)
+  async create(
+    @CurrentUser() user: any,
+    @Body() createMatchDto: CreateMatchDto,
+  ) {
+    return this.matchService.create(user.id, createMatchDto);
+  }
+
+  @Get()
+  @Serialize(MatchResponseDto)
+  async findAll(@Query('tournamentId') tournamentId?: string) {
+    return this.matchService.findAll(tournamentId);
+  }
+
+  @Get(':id')
+  @Serialize(MatchResponseDto)
+  async findOne(@Param('id') id: string) {
+    return this.matchService.findOne(id);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  @Serialize(MatchResponseDto)
+  async update(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() updateMatchDto: UpdateMatchDto,
+  ) {
+    return this.matchService.update(id, user.id, updateMatchDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.matchService.remove(id, user.id);
+  }
+
+  @Post(':id/scorer')
+  @UseGuards(JwtAuthGuard)
+  async assignScorer(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() assignScorerDto: AssignScorerDto,
+  ) {
+    return this.matchService.assignScorer(id, user.id, assignScorerDto);
+  }
+
+  @Post(':id/start')
+  @UseGuards(JwtAuthGuard)
+  async startMatch(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.matchService.startMatch(id, user.id);
+  }
+
+  @Post(':id/toss')
+  @UseGuards(JwtAuthGuard)
+  async recordToss(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() tossDto: TossDto,
+  ) {
+    return this.matchService.recordToss(id, user.id, tossDto);
+  }
+
+  @Get(':id/invitations')
+  @UseGuards(JwtAuthGuard)
+  async getInvitations(@Param('id') matchId: string) {
+    return this.matchService.getInvitations(matchId);
+  }
+
+  @Post('invitations/:invitationId/accept')
+  @UseGuards(JwtAuthGuard)
+  async acceptInvitation(
+    @Param('invitationId') invitationId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.matchService.acceptInvitation(invitationId, user.id);
+  }
+
+  @Post('invitations/:invitationId/reject')
+  @UseGuards(JwtAuthGuard)
+  async rejectInvitation(
+    @Param('invitationId') invitationId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.matchService.rejectInvitation(invitationId, user.id);
+  }
+
+  @Get(':id/result')
+  async getResult(@Param('id') matchId: string) {
+    return this.matchService.getResult(matchId);
+  }
+}
+

@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: hostell@123
-      POSTGRES_DB: hostell
+      POSTGRES_DB: cricket_spirit
     ports:
       - "5432:5432"
     volumes:

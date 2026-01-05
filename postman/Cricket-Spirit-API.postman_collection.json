@@ -1,0 +1,2015 @@
+{
+  "info": {
+    "name": "Cricket Spirit API",
+    "description": "Complete API collection for Cricket Spirit Backend - All 4 Phases",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "cricket-spirit"
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"name\": \"John Doe\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "Register a new user account"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"access_token\", jsonData.data.accessToken);",
+                  "    pm.environment.set(\"refresh_token\", jsonData.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Login and get access/refresh tokens"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            },
+            "description": "Refresh access token using refresh token"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "me"]
+            },
+            "description": "Get current authenticated user details"
+          },
+          "response": []
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/forgot-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "forgot-password"]
+            },
+            "description": "Request password reset"
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"reset-token-here\",\n  \"password\": \"NewPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/reset-password",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "reset-password"]
+            },
+            "description": "Reset password with token"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Players",
+      "item": [
+        {
+          "name": "Register as Player",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"gender\": \"MALE\",\n  \"dateOfBirth\": \"1995-05-15T00:00:00.000Z\",\n  \"playerType\": \"ALL_ROUNDER\",\n  \"isWicketKeeper\": false,\n  \"batHand\": \"RIGHT\",\n  \"bowlHand\": \"RIGHT\",\n  \"bowlingTypeIds\": [\"bowling-type-id-1\", \"bowling-type-id-2\"],\n  \"addressId\": \"address-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/players/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "players", "register"]
+            },
+            "description": "Register current user as a player"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Players",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/players?city=Lahore&state=Punjab&gender=MALE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "players"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Lahore",
+                  "description": "Optional filter by city"
+                },
+                {
+                  "key": "state",
+                  "value": "Punjab",
+                  "description": "Optional filter by state"
+                },
+                {
+                  "key": "gender",
+                  "value": "MALE",
+                  "description": "Optional filter by gender"
+                }
+              ]
+            },
+            "description": "Get all players with optional filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Player by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/players/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "players", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "player-id-here"
+                }
+              ]
+            },
+            "description": "Get player details by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Player",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Smith\",\n  \"playerType\": \"BATSMAN\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/players/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "players", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "player-id-here"
+                }
+              ]
+            },
+            "description": "Update player profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Player",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/players/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "players", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "player-id-here"
+                }
+              ]
+            },
+            "description": "Soft delete player profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Profile Picture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/players/upload-profile-picture",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "players", "upload-profile-picture"]
+            },
+            "description": "Upload player profile picture (max 1MB, jpg/png/webp)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Address",
+      "item": [
+        {
+          "name": "Create Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"street\": \"123 Main Street\",\n  \"townSuburb\": \"Gulberg\",\n  \"city\": \"Lahore\",\n  \"state\": \"Punjab\",\n  \"country\": \"Pakistan\",\n  \"postalCode\": \"54000\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/addresses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "addresses"]
+            },
+            "description": "Create a new address"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Countries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/addresses/countries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "addresses", "countries"]
+            },
+            "description": "Get list of countries"
+          },
+          "response": []
+        },
+        {
+          "name": "Get States by Country",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/addresses/states?country=Pakistan",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "addresses", "states"],
+              "query": [
+                {
+                  "key": "country",
+                  "value": "Pakistan"
+                }
+              ]
+            },
+            "description": "Get states by country"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Cities by State",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/addresses/cities?state=Punjab",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "addresses", "cities"],
+              "query": [
+                {
+                  "key": "state",
+                  "value": "Punjab"
+                }
+              ]
+            },
+            "description": "Get cities by state"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Towns by City",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/addresses/towns?city=Lahore",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "addresses", "towns"],
+              "query": [
+                {
+                  "key": "city",
+                  "value": "Lahore"
+                }
+              ]
+            },
+            "description": "Get towns/suburbs by city"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Bowling Types",
+      "item": [
+        {
+          "name": "Get All Bowling Types",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/bowling-types",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "bowling-types"]
+            },
+            "description": "Get all available bowling types"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Clubs",
+      "item": [
+        {
+          "name": "Create Club",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lahore Cricket Club\",\n  \"bio\": \"Premier cricket club in Lahore\",\n  \"establishedDate\": \"2010-01-15T00:00:00.000Z\",\n  \"addressId\": \"address-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/clubs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "clubs"]
+            },
+            "description": "Create a new club"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Clubs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clubs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "clubs"]
+            },
+            "description": "Get all clubs"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Club by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clubs/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "clubs", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "club-id-here"
+                }
+              ]
+            },
+            "description": "Get club details by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Club",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lahore Premier Cricket Club\",\n  \"bio\": \"Updated bio\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/clubs/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "clubs", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "club-id-here"
+                }
+              ]
+            },
+            "description": "Update club details"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Club",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clubs/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "clubs", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "club-id-here"
+                }
+              ]
+            },
+            "description": "Delete club"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Club Teams",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clubs/:id/teams",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "clubs", ":id", "teams"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "club-id-here"
+                }
+              ]
+            },
+            "description": "Get all teams of a club"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Club Profile Picture",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/clubs/upload-profile-picture",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "clubs", "upload-profile-picture"]
+            },
+            "description": "Upload club profile picture"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Teams",
+      "item": [
+        {
+          "name": "Create Team",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clubId\": \"club-id-here\",\n  \"name\": \"Lahore Lions\",\n  \"description\": \"Premier team of Lahore Cricket Club\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams"]
+            },
+            "description": "Create a new team"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Teams",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams"]
+            },
+            "description": "Get all teams"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "team-id-here"
+                }
+              ]
+            },
+            "description": "Get team details by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Team",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lahore Tigers\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "team-id-here"
+                }
+              ]
+            },
+            "description": "Update team details"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Team",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "team-id-here"
+                }
+              ]
+            },
+            "description": "Delete team"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Player to Team",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": \"player-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/:id/players",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ":id", "players"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "team-id-here"
+                }
+              ]
+            },
+            "description": "Invite player to team (sends email invitation)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Team Players",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/:id/players",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", ":id", "players"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "team-id-here"
+                }
+              ]
+            },
+            "description": "Get all players in a team"
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Team Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/invitations/:invitationId/accept",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "invitations", ":invitationId", "accept"],
+              "variable": [
+                {
+                  "key": "invitationId",
+                  "value": "invitation-id-here"
+                }
+              ]
+            },
+            "description": "Accept team invitation"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Team Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/invitations/:invitationId/reject",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "invitations", ":invitationId", "reject"],
+              "variable": [
+                {
+                  "key": "invitationId",
+                  "value": "invitation-id-here"
+                }
+              ]
+            },
+            "description": "Reject team invitation"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Team Logo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/teams/upload-logo",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "teams", "upload-logo"]
+            },
+            "description": "Upload team logo"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Tournaments",
+      "item": [
+        {
+          "name": "Create Tournament",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lahore Premier League 2024\",\n  \"format\": \"T20\",\n  \"customOvers\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments"]
+            },
+            "description": "Create a new tournament"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Tournaments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments"]
+            },
+            "description": "Get all tournaments"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Tournament by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                }
+              ]
+            },
+            "description": "Get tournament details"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Tournament",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lahore Premier League 2024 - Updated\",\n  \"status\": \"ONGOING\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                }
+              ]
+            },
+            "description": "Update tournament"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Tournament",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                }
+              ]
+            },
+            "description": "Delete tournament"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Team to Tournament",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teamId\": \"team-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id/teams",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id", "teams"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                }
+              ]
+            },
+            "description": "Add team to tournament (sends invitation)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Tournament Teams",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id/teams",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id", "teams"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                }
+              ]
+            },
+            "description": "Get all teams in tournament"
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Team from Tournament",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id/teams/:teamId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id", "teams", ":teamId"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                },
+                {
+                  "key": "teamId",
+                  "value": "team-id-here"
+                }
+              ]
+            },
+            "description": "Remove team from tournament"
+          },
+          "response": []
+        },
+        {
+          "name": "Team Withdraw from Tournament",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id/teams/:teamId/withdraw",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id", "teams", ":teamId", "withdraw"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                },
+                {
+                  "key": "teamId",
+                  "value": "team-id-here"
+                }
+              ]
+            },
+            "description": "Team withdraws from tournament"
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Tournament Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/invitations/:invitationId/accept",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", "invitations", ":invitationId", "accept"],
+              "variable": [
+                {
+                  "key": "invitationId",
+                  "value": "invitation-id-here"
+                }
+              ]
+            },
+            "description": "Accept tournament team invitation"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Tournament Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/invitations/:invitationId/reject",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", "invitations", ":invitationId", "reject"],
+              "variable": [
+                {
+                  "key": "invitationId",
+                  "value": "invitation-id-here"
+                }
+              ]
+            },
+            "description": "Reject tournament team invitation"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Tournament Points Table",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id/points-table",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id", "points-table"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                }
+              ]
+            },
+            "description": "Get tournament points table"
+          },
+          "response": []
+        },
+        {
+          "name": "Calculate Points Table",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/:id/points-table/calculate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", ":id", "points-table", "calculate"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "tournament-id-here"
+                }
+              ]
+            },
+            "description": "Calculate/update tournament points table"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Tournament Cover",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/upload-cover",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", "upload-cover"]
+            },
+            "description": "Upload tournament cover picture"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Tournament Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/tournaments/upload-profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tournaments", "upload-profile"]
+            },
+            "description": "Upload tournament profile picture"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Matches",
+      "item": [
+        {
+          "name": "Create Match (Tournament)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tournamentId\": \"tournament-id-here\",\n  \"team1Id\": \"team-id-1\",\n  \"team2Id\": \"team-id-2\",\n  \"overs\": 20,\n  \"ballType\": \"LEATHER\",\n  \"format\": \"T20\",\n  \"scheduledDate\": \"2024-06-15T10:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches"]
+            },
+            "description": "Create a tournament match"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Quick Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"team1Id\": \"team-id-1\",\n  \"team2Id\": \"team-id-2\",\n  \"overs\": 10,\n  \"ballType\": \"LEATHER\",\n  \"format\": \"CUSTOM\",\n  \"customOvers\": 10,\n  \"scheduledDate\": \"2024-06-15T10:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches"]
+            },
+            "description": "Create a quick match (non-tournament)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Matches",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches?tournamentId=tournament-id-here",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches"],
+              "query": [
+                {
+                  "key": "tournamentId",
+                  "value": "tournament-id-here",
+                  "description": "Optional: Filter by tournament"
+                }
+              ]
+            },
+            "description": "Get all matches"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Match by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Get match details"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Match",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scheduledDate\": \"2024-06-16T10:00:00.000Z\",\n  \"overs\": 20\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Update match (only before match starts)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Match",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Delete match (only before match starts)"
+          },
+          "response": []
+        },
+        {
+          "name": "Assign Scorer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scorerId\": \"user-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:id/scorer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":id", "scorer"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Assign scorer to match"
+          },
+          "response": []
+        },
+        {
+          "name": "Start Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:id/start",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":id", "start"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Start match (changes status to TOSS, only scorer can do this)"
+          },
+          "response": []
+        },
+        {
+          "name": "Record Toss",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tossWinnerId\": \"team-id-here\",\n  \"tossDecision\": \"BAT\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:id/toss",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":id", "toss"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Record toss result (changes status to IN_PROGRESS, only scorer can do this)"
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Match Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/invitations/:invitationId/accept",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", "invitations", ":invitationId", "accept"],
+              "variable": [
+                {
+                  "key": "invitationId",
+                  "value": "invitation-id-here"
+                }
+              ]
+            },
+            "description": "Accept match invitation"
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Match Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/invitations/:invitationId/reject",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", "invitations", ":invitationId", "reject"],
+              "variable": [
+                {
+                  "key": "invitationId",
+                  "value": "invitation-id-here"
+                }
+              ]
+            },
+            "description": "Reject match invitation"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Match Result",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:id/result",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":id", "result"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Get match result"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. Scoring",
+      "item": [
+        {
+          "name": "Start Over",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bowlerId\": \"player-id-here\",\n  \"batsmanId\": \"player-id-here\",\n  \"nonStrikerId\": \"player-id-here\",\n  \"overNumber\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/start-over",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "start-over"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Start a new over"
+          },
+          "response": []
+        },
+        {
+          "name": "Score Ball - Normal Run",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"runs\": 4\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/score-ball",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "score-ball"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Score a normal ball (runs 0-6)"
+          },
+          "response": []
+        },
+        {
+          "name": "Score Ball - Wide",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"runs\": 0,\n  \"isWide\": true,\n  \"wideRuns\": 4\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/score-ball",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "score-ball"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Score a wide (wd4 = 1 wide + 4 runs)"
+          },
+          "response": []
+        },
+        {
+          "name": "Score Ball - No Ball",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"runs\": 1,\n  \"isNoBall\": true,\n  \"noBallRuns\": 0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/score-ball",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "score-ball"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Score a no-ball (nb = 1 no-ball + runs scored)"
+          },
+          "response": []
+        },
+        {
+          "name": "Score Ball - Wicket (Bowled)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"runs\": 0,\n  \"wicketType\": \"BOWLED\",\n  \"dismissedBatsmanId\": \"player-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/score-ball",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "score-ball"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Score a wicket (bowled)"
+          },
+          "response": []
+        },
+        {
+          "name": "Score Ball - Wicket (Caught)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"runs\": 0,\n  \"wicketType\": \"CAUGHT\",\n  \"wicketPlayerId\": \"player-id-here\",\n  \"dismissedBatsmanId\": \"player-id-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/score-ball",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "score-ball"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Score a wicket (caught)"
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Over",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/complete-over",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "complete-over"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Manually complete an over"
+          },
+          "response": []
+        },
+        {
+          "name": "Switch Innings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/switch-innings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "switch-innings"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Switch to second innings"
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/complete-match",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "complete-match"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Complete match and create result"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current Match State",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/matches/:matchId/scoring/current-state",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "matches", ":matchId", "scoring", "current-state"],
+              "variable": [
+                {
+                  "key": "matchId",
+                  "value": "match-id-here"
+                }
+              ]
+            },
+            "description": "Get current match state (scores, current over, etc.)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
+
