@@ -97,9 +97,21 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
-    // Find user
+    // Find user with player profile
     const user = await this.prisma.user.findUnique({
       where: { email },
+      include: {
+        player: {
+          include: {
+            address: true,
+            bowlingTypes: {
+              include: {
+                bowlingType: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!user) {
@@ -121,6 +133,16 @@ export class AuthService {
     // Generate tokens
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
+    // Format player data if exists
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let playerData: any = null;
+    if (user.player) {
+      playerData = {
+        ...user.player,
+        bowlingTypes: user.player.bowlingTypes.map((pt) => pt.bowlingType),
+      };
+    }
+
     this.logger.info('User logged in successfully', {
       userId: user.id,
       email,
@@ -136,7 +158,9 @@ export class AuthService {
           name: user.name,
           role: user.role,
           isEmailVerified: user.isEmailVerified,
+          hasPlayerProfile: !!user.player,
         },
+        player: playerData,
         ...tokens,
       },
     };
@@ -382,15 +406,40 @@ export class AuthService {
   async getCurrentUser(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: {
+        player: {
+          include: {
+            address: true,
+            bowlingTypes: {
+              include: {
+                bowlingType: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     if (!user || user.deletedAt) {
       throw new UnauthorizedException('User not found');
     }
 
+    // Format player data if exists
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let playerData: any = null;
+    if (user.player) {
+      playerData = {
+        ...user.player,
+        bowlingTypes: user.player.bowlingTypes.map((pt) => pt.bowlingType),
+      };
+    }
+
     return {
       message: 'User retrieved successfully',
-      data: user,
+      data: {
+        ...user,
+        player: playerData,
+      },
     };
   }
 

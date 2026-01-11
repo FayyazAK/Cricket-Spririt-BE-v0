@@ -268,6 +268,8 @@ POST /auth/login
 ```
 
 ### Success Response (200 OK)
+
+**If user has NO player profile:**
 ```json
 {
   "message": "Login successful",
@@ -277,7 +279,54 @@ POST /auth/login
       "email": "john.doe@example.com",
       "name": "John Doe",
       "role": "USER",
-      "isEmailVerified": true
+      "isEmailVerified": true,
+      "hasPlayerProfile": false
+    },
+    "player": null,
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+**If user HAS player profile:**
+```json
+{
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "email": "john.doe@example.com",
+      "name": "John Doe",
+      "role": "USER",
+      "isEmailVerified": true,
+      "hasPlayerProfile": true
+    },
+    "player": {
+      "id": "player-uuid",
+      "firstName": "Virat",
+      "lastName": "Kohli",
+      "gender": "MALE",
+      "dateOfBirth": "1988-11-05T00:00:00.000Z",
+      "profilePicture": "http://localhost:3000/uploads/profile-pictures/abc123.jpg",
+      "playerType": "BATSMAN",
+      "isWicketKeeper": false,
+      "batHand": "RIGHT",
+      "bowlHand": "RIGHT",
+      "isActive": true,
+      "address": {
+        "id": "address-uuid",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "country": "India"
+      },
+      "bowlingTypes": [
+        {
+          "id": "bowling-type-uuid",
+          "shortName": "FAST",
+          "fullName": "Fast"
+        }
+      ]
     },
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
@@ -471,7 +520,7 @@ POST /auth/reset-password
 
 ## 8. Get Current User
 
-Get authenticated user's profile information.
+Get authenticated user's profile information including player profile if exists.
 
 ### Endpoint
 ```
@@ -484,6 +533,8 @@ Authorization: Bearer <accessToken>
 ```
 
 ### Success Response (200 OK)
+
+**If user has NO player profile:**
 ```json
 {
   "message": "User retrieved successfully",
@@ -495,7 +546,54 @@ Authorization: Bearer <accessToken>
     "isEmailVerified": true,
     "createdAt": "2026-01-11T13:25:00.000Z",
     "updatedAt": "2026-01-11T13:25:00.000Z",
-    "deletedAt": null
+    "deletedAt": null,
+    "player": null
+  }
+}
+```
+
+**If user HAS player profile:**
+```json
+{
+  "message": "User retrieved successfully",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "john.doe@example.com",
+    "name": "John Doe",
+    "role": "USER",
+    "isEmailVerified": true,
+    "createdAt": "2026-01-11T13:25:00.000Z",
+    "updatedAt": "2026-01-11T13:25:00.000Z",
+    "deletedAt": null,
+    "player": {
+      "id": "player-uuid",
+      "firstName": "Virat",
+      "lastName": "Kohli",
+      "gender": "MALE",
+      "dateOfBirth": "1988-11-05T00:00:00.000Z",
+      "profilePicture": "http://localhost:3000/uploads/profile-pictures/abc123.jpg",
+      "playerType": "BATSMAN",
+      "isWicketKeeper": false,
+      "batHand": "RIGHT",
+      "bowlHand": "RIGHT",
+      "isActive": true,
+      "address": {
+        "id": "address-uuid",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "country": "India",
+        "postalCode": "400053"
+      },
+      "bowlingTypes": [
+        {
+          "id": "bowling-type-uuid",
+          "shortName": "FAST",
+          "fullName": "Fast"
+        }
+      ],
+      "createdAt": "2026-01-11T14:00:00.000Z",
+      "updatedAt": "2026-01-11T14:00:00.000Z"
+    }
   }
 }
 ```
@@ -1133,26 +1231,35 @@ ORTHODOX - Orthodox
 8. Redirect to login
 ```
 
-### Complete Player Registration Flow
+### Complete User + Player Registration Flow
 
 ```
-1. User completes account registration and login
+1. User registers account
+   POST /api/v1/auth/register
    ↓
-2. GET /api/v1/bowling-types (fetch available bowling types)
+2. User verifies email with OTP
+   POST /api/v1/auth/verify-email
    ↓
-3. User fills player profile form
+3. User logs in
+   POST /api/v1/auth/login
    ↓
-4. (Optional) Upload profile picture
-   POST /api/v1/players/upload-profile-picture
+4. Check response: user.hasPlayerProfile
    ↓
-5. POST /api/v1/players/register (with profile picture URL)
-   ↓
-6. Show success message
-   ↓
-7. Redirect to dashboard/player profile
+5a. If hasPlayerProfile = false:
+    → Redirect to player registration
+    → GET /api/v1/bowling-types
+    → (Optional) POST /api/v1/players/upload-profile-picture
+    → POST /api/v1/players/register
+    → Redirect to dashboard
+    ↓
+5b. If hasPlayerProfile = true:
+    → Redirect directly to dashboard
+    → Player data already available in login response
 ```
 
 **Important Notes:**
+- Login and `/auth/me` endpoints automatically return player profile if it exists
+- Check `hasPlayerProfile` flag to determine if player registration is needed
 - User must be authenticated (logged in) before creating player profile
 - Profile picture upload is optional but recommended
 - Each user can only have ONE player profile
@@ -1327,6 +1434,21 @@ Authorization: Bearer <your-access-token>
 - Profile picture upload is optional but recommended
 - Address information is required (city, state, country are mandatory)
 
+### 4. Player Profile in Auth Responses
+- ✅ Login response includes `hasPlayerProfile` flag and `player` object
+- ✅ `/auth/me` endpoint returns full player profile if exists
+- ✅ Use `hasPlayerProfile` to conditionally redirect users
+- ✅ Player profile includes address and bowling types
+- **Frontend Flow:**
+  ```javascript
+  // After login
+  if (!response.data.user.hasPlayerProfile) {
+    navigate('/player/register');  // Force player registration
+  } else {
+    navigate('/dashboard');  // User is fully set up
+  }
+  ```
+
 ### 5. OTP Expiry
 - OTPs expire in **15 minutes**
 - Show countdown timer on verification screen
@@ -1436,8 +1558,17 @@ const handleLogin = async (credentials) => {
       localStorage.setItem('accessToken', data.data.accessToken);
       localStorage.setItem('refreshToken', data.data.refreshToken);
       
-      // Redirect to dashboard
-      navigate('/dashboard');
+      // Store user and player info
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+      
+      // Check if user has player profile
+      if (data.data.user.hasPlayerProfile && data.data.player) {
+        localStorage.setItem('player', JSON.stringify(data.data.player));
+        navigate('/dashboard');
+      } else {
+        // Redirect to player registration if no profile
+        navigate('/player/register');
+      }
     } else {
       setError(data.message);
     }
@@ -1591,8 +1722,19 @@ bowlingTypes.map(type => (
     email: string,
     name: string,
     role: string,
-    isEmailVerified: boolean
+    isEmailVerified: boolean,
+    hasPlayerProfile: boolean  // NEW: Check if player profile exists
   },
+  player: {  // NEW: Player profile data (null if not exists)
+    id: string,
+    firstName: string,
+    lastName: string,
+    gender: string,
+    playerType: string,
+    batHand: string,
+    bowlHand: string,
+    // ... other player fields
+  } | null,
   accessToken: string,
   refreshToken: string,
   isAuthenticated: boolean,
