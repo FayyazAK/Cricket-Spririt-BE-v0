@@ -28,6 +28,15 @@ async function bootstrap() {
     bufferLogs: true,
   });
   app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));
+
+  // Enable CORS for all origins
+  app.enableCors({
+    origin: true, // Allow all origins
+    credentials: true, // Allow credentials (cookies, authorization headers)
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  });
+
   app.setGlobalPrefix('api');
 
   // Serve static files for uploads

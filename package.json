@@ -20,7 +20,8 @@
     "test:e2e": "cross-env NODE_ENV=test jest --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "prisma:clean-seed": "tsx prisma/clean-seed.ts"
   },
   "dependencies": {
     "@keyv/redis": "^5.1.4",

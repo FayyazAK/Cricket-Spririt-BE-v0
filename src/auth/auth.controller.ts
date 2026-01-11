@@ -11,6 +11,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
+import { VerifyEmailDto } from './dtos/verify-email.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -40,8 +41,17 @@ export class AuthController {
 
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
-  async verifyEmail(@Body('token') token: string) {
-    return this.authService.verifyEmail(token);
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
+    return this.authService.verifyEmail(
+      verifyEmailDto.email,
+      verifyEmailDto.otp,
+    );
+  }
+
+  @Post('resend-verification-otp')
+  @HttpCode(HttpStatus.OK)
+  async resendVerificationOTP(@Body('email') email: string) {
+    return this.authService.resendVerificationOTP(email);
   }
 
   @Post('forgot-password')

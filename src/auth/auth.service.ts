@@ -11,7 +11,6 @@ import { EmailService } from '../common/email/email.service';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 import * as bcrypt from 'bcrypt';
-import * as crypto from 'crypto';
 import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
@@ -38,47 +37,60 @@ export class AuthService {
       throw new BadRequestException('User with this email already exists');
     }
 
+    // Check if there's already a pending registration
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const existingPending = await this.prisma.pendingRegistration.findUnique({
+      where: { email },
+    });
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate email verification token
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    // Generate 6-digit OTP
+    const otp = this.generateOTP();
+    const otpExpires = new Date();
+    otpExpires.setMinutes(otpExpires.getMinutes() + 15); // 15 minutes expiry
 
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        name,
-        password: hashedPassword,
-        emailVerificationToken,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        isEmailVerified: true,
-        createdAt: true,
-      },
-    });
+    // Create or update pending registration
+    if (existingPending) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await this.prisma.pendingRegistration.update({
+        where: { email },
+        data: {
+          name,
+          password: hashedPassword,
+          otp,
+          otpExpires,
+        },
+      });
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      await this.prisma.pendingRegistration.create({
+        data: {
+          email,
+          name,
+          password: hashedPassword,
+          otp,
+          otpExpires,
+        },
+      });
+    }
 
-    // Send verification email
-    const verificationLink = `${this.configService.get('app.frontendUrl') || 'http://localhost:3000'}/auth/verify-email?token=${emailVerificationToken}`;
-    await this.emailService.sendEmailVerification(
-      email,
-      name,
-      verificationLink,
-    );
+    // Send verification email with OTP
+    await this.emailService.sendEmailVerification(email, name, otp);
 
-    this.logger.info('User registered successfully', {
-      userId: user.id,
+    this.logger.info('Registration initiated, OTP sent', {
       email,
       context: AuthService.name,
     });
 
     return {
-      message: 'User registered successfully. Please check your email to verify your account.',
-      data: user,
+      message:
+        'Registration initiated. Please check your email for the verification OTP.',
+      data: {
+        email,
+        name,
+      },
     };
   }
 
@@ -133,11 +145,14 @@ export class AuthService {
   async refreshToken(refreshToken: string) {
     try {
       const jwtConfig = this.configService.get('jwt');
+
       const payload = this.jwtService.verify(refreshToken, {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         secret: jwtConfig.refreshSecret,
       });
 
       const user = await this.prisma.user.findUnique({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         where: { id: payload.sub },
       });
 
@@ -151,41 +166,137 @@ export class AuthService {
         message: 'Token refreshed successfully',
         data: tokens,
       };
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
 
-  async verifyEmail(token: string) {
-    const user = await this.prisma.user.findFirst({
-      where: {
-        emailVerificationToken: token,
-      },
+  async verifyEmail(email: string, otp: string) {
+    // Check if user already exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
     });
 
-    if (!user) {
-      throw new BadRequestException('Invalid verification token');
+    if (existingUser) {
+      throw new BadRequestException('User already registered');
     }
 
-    if (user.isEmailVerified) {
-      throw new BadRequestException('Email already verified');
+    // Find pending registration
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const pendingRegistration =
+      await this.prisma.pendingRegistration.findUnique({
+        where: { email },
+      });
+
+    if (!pendingRegistration) {
+      throw new BadRequestException(
+        'No pending registration found for this email',
+      );
     }
 
-    await this.prisma.user.update({
-      where: { id: user.id },
+    // Validate OTP
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (pendingRegistration.otp !== otp) {
+      throw new BadRequestException('Invalid OTP');
+    }
+
+    // Check OTP expiry
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (pendingRegistration.otpExpires < new Date()) {
+      throw new BadRequestException('OTP has expired');
+    }
+
+    // Create the actual user
+    const user = await this.prisma.user.create({
       data: {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        email: pendingRegistration.email,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        name: pendingRegistration.name,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        password: pendingRegistration.password,
         isEmailVerified: true,
-        emailVerificationToken: null,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isEmailVerified: true,
+        createdAt: true,
       },
     });
 
-    this.logger.info('Email verified successfully', {
+    // Delete pending registration
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    await this.prisma.pendingRegistration.delete({
+      where: { email },
+    });
+
+    this.logger.info('Email verified and user created successfully', {
       userId: user.id,
+      email,
       context: AuthService.name,
     });
 
     return {
-      message: 'Email verified successfully',
+      message: 'Email verified successfully. You can now login.',
+      data: user,
+    };
+  }
+
+  async resendVerificationOTP(email: string) {
+    // Check if user already exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException('User already registered. Please login.');
+    }
+
+    // Find pending registration
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    const pendingRegistration =
+      await this.prisma.pendingRegistration.findUnique({
+        where: { email },
+      });
+
+    if (!pendingRegistration) {
+      throw new BadRequestException(
+        'No pending registration found for this email',
+      );
+    }
+
+    // Generate new OTP
+    const otp = this.generateOTP();
+    const otpExpires = new Date();
+    otpExpires.setMinutes(otpExpires.getMinutes() + 15); // 15 minutes expiry
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+    await this.prisma.pendingRegistration.update({
+      where: { email },
+      data: {
+        otp,
+        otpExpires,
+      },
+    });
+
+    // Send verification email with new OTP
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+    await this.emailService.sendEmailVerification(
+      email,
+      pendingRegistration.name,
+      otp,
+    );
+
+    this.logger.info('Verification OTP resent successfully', {
+      email,
+      context: AuthService.name,
+    });
+
+    return {
+      message: 'Verification OTP has been resent to your email.',
     };
   }
 
@@ -197,34 +308,35 @@ export class AuthService {
     if (!user) {
       // Don't reveal if user exists
       return {
-        message: 'If an account with that email exists, a password reset link has been sent.',
+        message:
+          'If an account with that email exists, a password reset OTP has been sent.',
       };
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetExpires = new Date();
-    resetExpires.setHours(resetExpires.getHours() + 1); // 1 hour expiry
+    // Generate 6-digit OTP
+    const resetOTP = this.generateOTP();
+    const otpExpires = new Date();
+    otpExpires.setMinutes(otpExpires.getMinutes() + 15); // 15 minutes expiry
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        passwordResetToken: resetToken,
-        passwordResetExpires: resetExpires,
+        passwordResetOTP: resetOTP,
+        passwordResetOTPExpires: otpExpires,
       },
     });
 
-    // Send reset email
-    const resetLink = `${this.configService.get('app.frontendUrl') || 'http://localhost:3000'}/auth/reset-password?token=${resetToken}`;
-    await this.emailService.sendPasswordReset(user.email, user.name, resetLink);
+    // Send reset email with OTP
+    await this.emailService.sendPasswordReset(user.email, user.name, resetOTP);
 
-    this.logger.info('Password reset email sent', {
+    this.logger.info('Password reset OTP sent', {
       userId: user.id,
       context: AuthService.name,
     });
 
     return {
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message:
+        'If an account with that email exists, a password reset OTP has been sent.',
     };
   }
 
@@ -233,15 +345,15 @@ export class AuthService {
 
     const user = await this.prisma.user.findFirst({
       where: {
-        passwordResetToken: token,
-        passwordResetExpires: {
+        passwordResetOTP: token,
+        passwordResetOTPExpires: {
           gt: new Date(),
         },
       },
     });
 
     if (!user) {
-      throw new BadRequestException('Invalid or expired reset token');
+      throw new BadRequestException('Invalid or expired OTP');
     }
 
     // Hash new password
@@ -252,8 +364,8 @@ export class AuthService {
       where: { id: user.id },
       data: {
         password: hashedPassword,
-        passwordResetToken: null,
-        passwordResetExpires: null,
+        passwordResetOTP: null,
+        passwordResetOTPExpires: null,
       },
     });
 
@@ -298,8 +410,10 @@ export class AuthService {
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload),
       this.jwtService.signAsync(payload, {
-        secret: jwtConfig.refreshSecret,
-        expiresIn: jwtConfig.refreshExpiresIn,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-type-assertion
+        secret: (jwtConfig as any).refreshSecret,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unnecessary-type-assertion
+        expiresIn: (jwtConfig as any).refreshExpiresIn,
       }),
     ]);
 
@@ -308,5 +422,9 @@ export class AuthService {
       refreshToken,
     };
   }
-}
 
+  private generateOTP(): string {
+    // Generate a 6-digit OTP
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+}

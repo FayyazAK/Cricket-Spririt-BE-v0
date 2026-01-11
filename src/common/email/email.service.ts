@@ -14,12 +14,16 @@ export class EmailService {
   ) {
     const emailConfig = this.configService.get('email');
     this.transporter = nodemailer.createTransport({
-      host: emailConfig.host,
-      port: emailConfig.port,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      host: (emailConfig as any).host,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      port: (emailConfig as any).port,
       secure: false, // true for 465, false for other ports
       auth: {
-        user: emailConfig.user,
-        pass: emailConfig.password,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        user: (emailConfig as any).user,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        pass: (emailConfig as any).password,
       },
     });
   }
@@ -34,7 +38,8 @@ export class EmailService {
 
     try {
       const info = await this.transporter.sendMail({
-        from: emailConfig.from,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        from: (emailConfig as any).from,
         to,
         subject,
         text,
@@ -44,6 +49,7 @@ export class EmailService {
       this.logger.info('Email sent successfully', {
         to,
         subject,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         messageId: info.messageId,
         context: EmailService.name,
       });
@@ -126,14 +132,15 @@ export class EmailService {
   async sendEmailVerification(
     to: string,
     name: string,
-    verificationLink: string,
+    otp: string,
   ): Promise<void> {
     const subject = 'Verify Your Email Address';
     const html = `
       <h2>Email Verification</h2>
       <p>Hello ${name},</p>
-      <p>Thank you for registering with Cricket Spirit. Please verify your email address by clicking the link below:</p>
-      <p><a href="${verificationLink}">${verificationLink}</a></p>
+      <p>Thank you for registering with Cricket Spirit. Please use the following OTP to verify your email address:</p>
+      <h1 style="color: #4CAF50; font-size: 32px; letter-spacing: 5px; text-align: center;">${otp}</h1>
+      <p>This OTP will expire in 15 minutes.</p>
       <p>If you did not create an account, please ignore this email.</p>
       <p>Best regards,<br>Cricket Spirit Team</p>
     `;
@@ -144,16 +151,16 @@ export class EmailService {
   async sendPasswordReset(
     to: string,
     name: string,
-    resetLink: string,
+    otp: string,
   ): Promise<void> {
     const subject = 'Password Reset Request';
     const html = `
       <h2>Password Reset</h2>
       <p>Hello ${name},</p>
-      <p>You have requested to reset your password. Click the link below to reset it:</p>
-      <p><a href="${resetLink}">${resetLink}</a></p>
+      <p>You have requested to reset your password. Please use the following OTP to reset your password:</p>
+      <h1 style="color: #4CAF50; font-size: 32px; letter-spacing: 5px; text-align: center;">${otp}</h1>
+      <p>This OTP will expire in 15 minutes.</p>
       <p>If you did not request this, please ignore this email.</p>
-      <p>This link will expire in 1 hour.</p>
       <p>Best regards,<br>Cricket Spirit Team</p>
     `;
 

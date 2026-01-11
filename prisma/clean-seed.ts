@@ -1,4 +1,4 @@
-// 🔑 REQUIRED: load .env so DATABASE_URL is available at runtime
+// Clean and re-seed bowling types
 import 'dotenv/config';
 
 import { PrismaClient } from '@prisma/client';
@@ -22,22 +22,27 @@ const bowlingTypes = [
 ];
 
 async function main() {
-  console.log('🌱 Seeding bowling types...');
+  console.log('🗑️  Deleting old bowling types...');
 
+  // Delete all existing bowling types
+  const deleted = await prisma.bowlingType.deleteMany({});
+  console.log(`   Deleted ${deleted.count} old bowling types`);
+
+  console.log('🌱 Seeding new bowling types...');
+
+  // Insert new bowling types
   for (const type of bowlingTypes) {
-    await prisma.bowlingType.upsert({
-      where: { shortName: type.shortName },
-      update: {},
-      create: type,
+    await prisma.bowlingType.create({
+      data: type,
     });
   }
 
-  console.log('✅ Bowling types seeded successfully!');
+  console.log('✅ Bowling types cleaned and seeded successfully!');
 }
 
 main()
   .catch((error) => {
-    console.error('❌ Seed failed:', error);
+    console.error('❌ Clean seed failed:', error);
     process.exit(1);
   })
   .finally(async () => {
