@@ -40,25 +40,91 @@ export class TeamService {
       );
     }
 
-    // Create team
-    const team = await this.prisma.team.create({
-      data: {
-        name: createTeamDto.name,
-        logo: createTeamDto.logo,
-        description: createTeamDto.description,
+    // Validate that all selected players are members of the club
+    const clubMembers = await this.prisma.playerClub.findMany({
+      where: {
         clubId: createTeamDto.clubId,
+        playerId: { in: createTeamDto.playerIds },
+        status: InvitationStatus.ACCEPTED,
       },
+      select: { playerId: true },
     });
 
-    this.logger.info('Team created successfully', {
-      teamId: team.id,
+    const validPlayerIds = clubMembers.map((m) => m.playerId);
+    const invalidPlayerIds = createTeamDto.playerIds.filter(
+      (id) => !validPlayerIds.includes(id),
+    );
+
+    if (invalidPlayerIds.length > 0) {
+      throw new BadRequestException(
+        `The following players are not members of this club: ${invalidPlayerIds.join(', ')}`,
+      );
+    }
+
+    // Create team and add players in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Create team
+      const team = await tx.team.create({
+        data: {
+          name: createTeamDto.name,
+          logo: createTeamDto.logo,
+          description: createTeamDto.description,
+          clubId: createTeamDto.clubId,
+        },
+      });
+
+      // Add players to team (auto-accepted since they're from club roster)
+      const playerTeamData = createTeamDto.playerIds.map((playerId) => ({
+        playerId,
+        teamId: team.id,
+        status: InvitationStatus.ACCEPTED,
+        invitedAt: new Date(),
+        invitationExpiresAt: new Date(), // Not relevant for auto-accepted
+        respondedAt: new Date(),
+      }));
+
+      await tx.playerTeam.createMany({
+        data: playerTeamData,
+      });
+
+      // Fetch team with players
+      return tx.team.findUnique({
+        where: { id: team.id },
+        include: {
+          players: {
+            where: { status: InvitationStatus.ACCEPTED },
+            include: {
+              player: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  playerType: true,
+                  profilePicture: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    this.logger.info('Team created successfully with players', {
+      teamId: result?.id,
       clubId: createTeamDto.clubId,
+      playerCount: createTeamDto.playerIds.length,
       context: TeamService.name,
     });
 
     return {
       message: 'Team created successfully',
-      data: team,
+      data: {
+        ...result,
+        players: result?.players.map((p) => ({
+          ...p.player,
+          joinedAt: p.respondedAt,
+        })),
+      },
     };
   }
 

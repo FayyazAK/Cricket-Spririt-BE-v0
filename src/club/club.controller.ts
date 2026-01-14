@@ -170,6 +170,12 @@ export class ClubController {
     return this.clubService.removePlayer(id, playerId, user.id);
   }
 
+  @Post(':id/leave')
+  @UseGuards(JwtAuthGuard)
+  async leaveClub(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.clubService.leaveClub(id, user.id);
+  }
+
   @Delete(':id/invitations/:invitationId')
   @UseGuards(JwtAuthGuard)
   @Serialize(ClubInvitationResponseDto)

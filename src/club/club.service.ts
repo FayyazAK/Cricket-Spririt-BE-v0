@@ -92,6 +92,16 @@ export class ClubService {
           where: {
             deletedAt: null,
           },
+          include: {
+            players: {
+              where: {
+                status: InvitationStatus.ACCEPTED,
+              },
+              select: {
+                id: true,
+              },
+            },
+          },
         },
         players: {
           include: {
@@ -124,11 +134,17 @@ export class ClubService {
       }));
 
     // Remove the raw players array
-    const { players: _, ...clubData } = club;
+    const teamsWithCounts = club.teams.map((team) => ({
+      ...team,
+      playerCount: team.players.length,
+    }));
+
+    const { players: _, teams, ...clubData } = club;
 
     // Base response for all users
     const response: any = {
       ...clubData,
+      teams: teamsWithCounts,
       clubPlayers,
       playerStats: {
         total: clubPlayers.length,
@@ -715,6 +731,63 @@ export class ClubService {
 
     return {
       message: 'Player removed from club successfully',
+    };
+  }
+
+  async leaveClub(clubId: string, userId: string) {
+    // Get the player for this user
+    const player = await this.prisma.player.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+
+    if (!player) {
+      throw new NotFoundException('Player profile not found');
+    }
+
+    // Check if club exists
+    const club = await this.prisma.club.findFirst({
+      where: {
+        id: clubId,
+        deletedAt: null,
+      },
+    });
+
+    if (!club) {
+      throw new NotFoundException('Club not found');
+    }
+
+    // Check if player is a member of the club
+    const membership = await this.prisma.playerClub.findFirst({
+      where: {
+        clubId,
+        playerId: player.id,
+        status: InvitationStatus.ACCEPTED,
+      },
+    });
+
+    if (!membership) {
+      throw new BadRequestException('You are not a member of this club');
+    }
+
+    // Remove player from club
+    await this.prisma.playerClub.delete({
+      where: {
+        id: membership.id,
+      },
+    });
+
+    this.logger.info('Player left club', {
+      clubId,
+      playerId: player.id,
+      context: ClubService.name,
+    });
+
+    return {
+      message: 'You have left the club successfully',
     };
   }
 

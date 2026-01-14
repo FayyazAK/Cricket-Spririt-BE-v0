@@ -56,6 +56,9 @@ class TeamBasicDto {
 
   @Expose()
   description?: string;
+
+  @Expose()
+  playerCount?: number;
 }
 
 export class ClubResponseDto {
