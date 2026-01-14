@@ -15,6 +15,7 @@ datasource db {
 
 enum UserRole {
   USER
+  PLAYER
   ADMIN
 }
 
@@ -182,6 +183,7 @@ model Player {
   address       Address     @relation(fields: [addressId], references: [id])
   bowlingTypes  PlayerBowlingType[]
   teamMemberships PlayerTeam[]
+  clubMemberships PlayerClub[]
   matchPlayers  MatchPlayer[]
   bowledOvers   Over[]
   battedBalls   Ball[]      @relation("Batsman")
@@ -240,6 +242,7 @@ model Club {
   address         Address  @relation(fields: [addressId], references: [id])
   owner           User     @relation("ClubOwner", fields: [ownerId], references: [id])
   teams           Team[]
+  players         PlayerClub[]
 
   @@map("clubs")
 }
@@ -288,6 +291,25 @@ model PlayerTeam {
 
   @@unique([playerId, teamId])
   @@map("player_teams")
+}
+
+model PlayerClub {
+  id                  String            @id @default(uuid())
+  playerId            String
+  clubId              String
+  status              InvitationStatus  @default(PENDING)
+  invitedAt           DateTime          @default(now())
+  invitationExpiresAt DateTime
+  respondedAt         DateTime?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  // Relations
+  player              Player            @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  club                Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, clubId])
+  @@map("player_clubs")
 }
 
 // ============================================

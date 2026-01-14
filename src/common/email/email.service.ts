@@ -86,6 +86,27 @@ export class EmailService {
     await this.sendEmail(to, subject, html);
   }
 
+  async sendClubInvitation(
+    to: string,
+    playerName: string,
+    clubName: string,
+    invitationLink: string,
+    expiryDays: number,
+  ): Promise<void> {
+    const subject = `Club Invitation: ${clubName}`;
+    const html = `
+      <h2>Club Invitation</h2>
+      <p>Hello ${playerName},</p>
+      <p>You have been invited to join <strong>${clubName}</strong>.</p>
+      <p>Click the link below to accept or reject the invitation:</p>
+      <p><a href="${invitationLink}">${invitationLink}</a></p>
+      <p>This invitation will expire in ${expiryDays} days.</p>
+      <p>Best regards,<br>Cricket Spirit Team</p>
+    `;
+
+    await this.sendEmail(to, subject, html);
+  }
+
   async sendTournamentInvitation(
     to: string,
     teamName: string,

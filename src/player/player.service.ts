@@ -12,7 +12,13 @@ import { RedisService } from '../common/redis/redis.service';
 import { CreatePlayerDto } from './dtos/create-player.dto';
 import { UpdatePlayerDto } from './dtos/update-player.dto';
 import { PlayerFilterDto } from './dtos/player-filter.dto';
-import { Gender, PlayerType, InvitationStatus } from '@prisma/client';
+import { PlayerSortBy } from './dtos/player-filter.dto';
+import {
+  Gender,
+  PlayerType,
+  InvitationStatus,
+  UserRole,
+} from '@prisma/client';
 
 @Injectable()
 export class PlayerService {
@@ -21,6 +27,23 @@ export class PlayerService {
     @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
     private readonly redis: RedisService,
   ) {}
+
+  async updateProfile(userId: string, updatePlayerDto: UpdatePlayerDto) {
+    const player = await this.prisma.player.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (!player) {
+      throw new NotFoundException('Player profile not found');
+    }
+
+    return this.update(player.id, userId, updatePlayerDto);
+  }
 
   async register(userId: string, createPlayerDto: CreatePlayerDto) {
     // Check if user already has a player profile
@@ -32,76 +55,84 @@ export class PlayerService {
       throw new BadRequestException('User already has an active player profile');
     }
 
-    // Create address
-    const address = await this.prisma.address.create({
-      data: createPlayerDto.address,
-    });
+    const playerWithTypes = await this.prisma.$transaction(async (tx) => {
+      // Create address
+      const address = await tx.address.create({
+        data: createPlayerDto.address,
+      });
 
-    // Create player
-    const player = await this.prisma.player.create({
-      data: {
-        userId,
-        firstName: createPlayerDto.firstName,
-        lastName: createPlayerDto.lastName,
-        gender: createPlayerDto.gender || Gender.MALE,
-        dateOfBirth: new Date(createPlayerDto.dateOfBirth),
-        profilePicture: createPlayerDto.profilePicture,
-        playerType: createPlayerDto.playerType,
-        isWicketKeeper: createPlayerDto.isWicketKeeper || false,
-        batHand: createPlayerDto.batHand,
-        bowlHand:
-          createPlayerDto.playerType === PlayerType.BATSMAN
-            ? null
-            : createPlayerDto.bowlHand || null,
-        addressId: address.id,
-        isActive: true,
-      },
-      include: {
-        address: true,
-        bowlingTypes: {
-          include: {
-            bowlingType: true,
-          },
+      // Create player
+      const player = await tx.player.create({
+        data: {
+          userId,
+          firstName: createPlayerDto.firstName,
+          lastName: createPlayerDto.lastName,
+          gender: createPlayerDto.gender || Gender.MALE,
+          dateOfBirth: new Date(createPlayerDto.dateOfBirth),
+          profilePicture: createPlayerDto.profilePicture,
+          playerType: createPlayerDto.playerType,
+          isWicketKeeper: createPlayerDto.isWicketKeeper || false,
+          batHand: createPlayerDto.batHand,
+          bowlHand:
+            createPlayerDto.playerType === PlayerType.BATSMAN
+              ? null
+              : createPlayerDto.bowlHand || null,
+          addressId: address.id,
+          isActive: true,
         },
-      },
-    });
+        select: { id: true },
+      });
 
-    // Add bowling types if provided
-    if (
-      createPlayerDto.bowlingTypeIds &&
-      createPlayerDto.bowlingTypeIds.length > 0
-    ) {
-      // Validate bowling types are for bowlers/all-rounders
-      if (createPlayerDto.playerType === PlayerType.BATSMAN) {
-        throw new BadRequestException(
-          'Batsmen cannot have bowling types assigned',
-        );
+      // Add bowling types if provided
+      if (
+        createPlayerDto.bowlingTypeIds &&
+        createPlayerDto.bowlingTypeIds.length > 0
+      ) {
+        // Validate bowling types are for bowlers/all-rounders
+        if (createPlayerDto.playerType === PlayerType.BATSMAN) {
+          throw new BadRequestException(
+            'Batsmen cannot have bowling types assigned',
+          );
+        }
+
+        await tx.playerBowlingType.createMany({
+          data: createPlayerDto.bowlingTypeIds.map((bowlingTypeId) => ({
+            playerId: player.id,
+            bowlingTypeId,
+          })),
+          skipDuplicates: true,
+        });
       }
 
-      await this.prisma.playerBowlingType.createMany({
-        data: createPlayerDto.bowlingTypeIds.map((bowlingTypeId) => ({
-          playerId: player.id,
-          bowlingTypeId,
-        })),
-        skipDuplicates: true,
+      // If user is a normal USER, promote to PLAYER
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
       });
-    }
 
-    // Refresh player with bowling types
-    const playerWithTypes = await this.prisma.player.findUnique({
-      where: { id: player.id },
-      include: {
-        address: true,
-        bowlingTypes: {
-          include: {
-            bowlingType: true,
+      if (user?.role === UserRole.USER) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { role: UserRole.PLAYER },
+        });
+      }
+
+      // Return player with relations
+      return tx.player.findUnique({
+        where: { id: player.id },
+        include: {
+          address: true,
+          bowlingTypes: {
+            include: {
+              bowlingType: true,
+            },
           },
         },
-      },
+      });
     });
 
     this.logger.info('Player registered successfully', {
-      playerId: player.id,
+      playerId: playerWithTypes?.id,
       userId,
       context: PlayerService.name,
     });
@@ -141,24 +172,47 @@ export class PlayerService {
       ];
     }
 
-    const players = await this.prisma.player.findMany({
-      where,
-      include: {
-        address: true,
-        bowlingTypes: {
-          include: {
-            bowlingType: true,
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const sortBy = filters.sortBy ?? PlayerSortBy.CREATED_AT;
+    const sortOrder = filters.sortOrder ?? 'desc';
+
+    const orderBy =
+      sortBy === PlayerSortBy.CITY
+        ? { address: { city: sortOrder } }
+        : { [sortBy]: sortOrder };
+
+    const [total, players] = await Promise.all([
+      this.prisma.player.count({ where }),
+      this.prisma.player.findMany({
+        where,
+        include: {
+          address: true,
+          bowlingTypes: {
+            include: {
+              bowlingType: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy,
+        skip,
+        take: limit,
+      }),
+    ]);
 
     return {
       message: 'Players retrieved successfully',
       data: players.map((p) => this.transformPlayer(p)),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        sortBy,
+        sortOrder,
+      },
     };
   }
 
@@ -320,6 +374,48 @@ export class PlayerService {
 
     return {
       message: 'Player deactivated successfully',
+    };
+  }
+
+  async getClubInvitations(userId: string) {
+    // Get the player for this user
+    const player = await this.prisma.player.findFirst({
+      where: {
+        userId,
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+
+    if (!player) {
+      throw new NotFoundException('Player profile not found');
+    }
+
+    const invitations = await this.prisma.playerClub.findMany({
+      where: {
+        playerId: player.id,
+        status: InvitationStatus.PENDING,
+        invitationExpiresAt: { gt: new Date() },
+      },
+      include: {
+        club: {
+          include: {
+            owner: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        invitedAt: 'desc',
+      },
+    });
+
+    return {
+      message: 'Club invitations retrieved successfully',
+      data: invitations,
     };
   }
 

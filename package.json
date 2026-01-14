@@ -21,7 +21,9 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "prisma:clean-seed": "tsx prisma/clean-seed.ts"
+    "prisma:clean-seed": "tsx prisma/clean-seed.ts",
+    "prisma:clean-db": "tsx prisma/clean-db.ts",
+    "prisma:seed-players": "tsx prisma/seed-players.ts"
   },
   "dependencies": {
     "@keyv/redis": "^5.1.4",

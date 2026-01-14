@@ -97,7 +97,7 @@ export class AuthService {
   async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
-    // Find user with player profile
+    // Find user with player profile and owned clubs
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: {
@@ -109,6 +109,17 @@ export class AuthService {
                 bowlingType: true,
               },
             },
+          },
+        },
+        clubs: {
+          where: {
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            name: true,
+            profilePicture: true,
+            address: true,
           },
         },
       },
@@ -161,6 +172,7 @@ export class AuthService {
           hasPlayerProfile: !!user.player,
         },
         player: playerData,
+        ownedClubs: user.clubs,
         ...tokens,
       },
     };
@@ -417,6 +429,17 @@ export class AuthService {
             },
           },
         },
+        clubs: {
+          where: {
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            name: true,
+            profilePicture: true,
+            address: true,
+          },
+        },
       },
     });
 
@@ -439,6 +462,7 @@ export class AuthService {
       data: {
         ...user,
         player: playerData,
+        ownedClubs: user.clubs,
       },
     };
   }

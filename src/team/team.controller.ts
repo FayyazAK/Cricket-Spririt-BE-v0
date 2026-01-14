@@ -11,7 +11,7 @@ import {
   UploadedFile,
   ParseFilePipe,
   MaxFileSizeValidator,
-  FileTypeValidator,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { TeamService } from './team.service';
@@ -142,14 +142,24 @@ export class TeamController {
           new MaxFileSizeValidator({
             maxSize: 1048576, // 1MB
           }),
-          new FileTypeValidator({
-            fileType: /(jpg|jpeg|png|webp)$/,
-          }),
         ],
       }),
     )
     file: Express.Multer.File,
   ) {
+    // Validate MIME type
+    const allowedMimeTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+    ];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Invalid file type. Only JPG, JPEG, PNG, and WebP images are allowed.',
+      );
+    }
+
     const filePath = await this.uploadService.saveFile(file, 'logos');
     const fileUrl = this.uploadService.getFileUrl(filePath);
 

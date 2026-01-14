@@ -23,6 +23,8 @@ interface StructuredResponse<T = unknown> {
   success?: boolean;
   message?: string;
   data?: T;
+  // Allow additional properties like pagination meta, etc.
+  [key: string]: unknown;
 }
 
 export const SKIP_SERIALIZE_KEY = 'skip_serialize';
@@ -62,12 +64,17 @@ export class SerializeInterceptor implements NestInterceptor {
       map((data: unknown) => {
         // Check if data is already in structured format
         if (this.isStructuredResponse(data)) {
+          const structured = data as StructuredResponse;
+          // Preserve additional keys like meta, etc.
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { success, message, data: payload, ...rest } = structured;
           // Serialize only the 'data' property within the structure
-          const serializedData = this.serializeData(data.data);
+          const serializedData = this.serializeData(payload);
           return {
-            success: data?.success ?? true,
-            message: data?.message ?? '',
+            success: structured?.success ?? true,
+            message: structured?.message ?? '',
             data: serializedData,
+            ...rest,
           };
         }
 

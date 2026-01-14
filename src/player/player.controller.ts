@@ -26,6 +26,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UploadService } from '../common/upload/upload.service';
 import { ConfigService } from '@nestjs/config';
 
+type AuthUser = {
+  id: string;
+};
+
 @Controller('players')
 @UseGuards(JwtAuthGuard)
 export class PlayerController {
@@ -38,7 +42,7 @@ export class PlayerController {
   @Post('register')
   @Serialize(PlayerResponseDto)
   async register(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthUser,
     @Body() createPlayerDto: CreatePlayerDto,
   ) {
     return this.playerService.register(user.id, createPlayerDto);
@@ -50,24 +54,38 @@ export class PlayerController {
     return this.playerService.findAll(filters);
   }
 
+  @Get('me/club-invitations')
+  async getClubInvitations(@CurrentUser() user: AuthUser) {
+    return await this.playerService.getClubInvitations(user.id);
+  }
+
   @Get(':id')
   @Serialize(PlayerResponseDto)
   async findOne(@Param('id') id: string) {
     return this.playerService.findOne(id);
   }
 
+  @Put('profile')
+  @Serialize(PlayerResponseDto)
+  async updateProfile(
+    @CurrentUser() user: AuthUser,
+    @Body() updatePlayerDto: UpdatePlayerDto,
+  ) {
+    return await this.playerService.updateProfile(user.id, updatePlayerDto);
+  }
+
   @Put(':id')
   @Serialize(PlayerResponseDto)
   async update(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthUser,
     @Body() updatePlayerDto: UpdatePlayerDto,
   ) {
     return this.playerService.update(id, user.id, updatePlayerDto);
   }
 
   @Delete(':id')
-  async deactivate(@Param('id') id: string, @CurrentUser() user: any) {
+  async deactivate(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.playerService.deactivate(id, user.id);
   }
 
@@ -113,4 +131,3 @@ export class PlayerController {
     };
   }
 }
-
