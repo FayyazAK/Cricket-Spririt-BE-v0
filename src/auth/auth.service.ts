@@ -14,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 import { ResetPasswordDto } from './dtos/reset-password.dto';
+import { InvitationStatus } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -427,6 +428,31 @@ export class AuthService {
                 bowlingType: true,
               },
             },
+            clubMemberships: {
+              where: { status: InvitationStatus.ACCEPTED },
+              include: {
+                club: {
+                  select: {
+                    id: true,
+                    name: true,
+                    profilePicture: true,
+                  },
+                },
+              },
+            },
+            teamMemberships: {
+              where: { status: InvitationStatus.ACCEPTED },
+              include: {
+                team: {
+                  select: {
+                    id: true,
+                    name: true,
+                    logo: true,
+                    clubId: true,
+                  },
+                },
+              },
+            },
           },
         },
         clubs: {
@@ -454,7 +480,11 @@ export class AuthService {
       playerData = {
         ...user.player,
         bowlingTypes: user.player.bowlingTypes.map((pt) => pt.bowlingType),
+        joinedClubs: user.player.clubMemberships.map((cm) => cm.club),
+        joinedTeams: user.player.teamMemberships.map((tm) => tm.team),
       };
+      delete playerData.clubMemberships;
+      delete playerData.teamMemberships;
     }
 
     return {
