@@ -55,7 +55,7 @@ export default () => ({
       parseInt(process.env.TOURNAMENT_INVITATION_EXPIRY_DAYS ?? '', 10) || 7,
     matchExpiryDays:
       parseInt(process.env.MATCH_INVITATION_EXPIRY_DAYS ?? '', 10) || 3,
-    autoAccept: process.env.AUTO_ACCEPT_INVITATIONS === 'true' || process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test',
+    autoAccept: process.env.AUTO_ACCEPT_INVITATIONS === 'true',
   },
   match: {
     minOvers: parseInt(process.env.MATCH_MIN_OVERS ?? '', 10) || 2,

@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dtos/createUser.dto';
 import { Serialize } from 'src/common/interceptors/response.interceptor';
@@ -10,8 +10,10 @@ export class UserController {
 
   @Get()
   @Serialize(UserResponseDto)
-  async findAll() {
-    const users = await this.userService.findAll();
+  async findAll(@Query('email') email?: string) {
+    const users = email
+      ? await this.userService.searchByEmail(email)
+      : await this.userService.findAll();
     return {
       success: true,
       message: 'Userss retrieved successfully',

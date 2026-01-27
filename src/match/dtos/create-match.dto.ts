@@ -16,6 +16,10 @@ export class CreateMatchDto {
   tournamentId?: string;
 
   @IsUUID()
+  @IsOptional()
+  scorerId?: string;
+
+  @IsUUID()
   team1Id: string;
 
   @IsUUID()

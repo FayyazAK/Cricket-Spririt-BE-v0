@@ -473,6 +473,33 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    const scorerInvitations = await this.prisma.matchScorerInvitation.findMany({
+      where: {
+        scorerId: userId,
+        status: InvitationStatus.PENDING,
+        invitationExpiresAt: {
+          gt: new Date(),
+        },
+      },
+      include: {
+        match: {
+          include: {
+            team1: true,
+            team2: true,
+            tournament: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        invitedAt: 'desc',
+      },
+    });
+
     // Format player data if exists
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let playerData: any = null;
@@ -493,6 +520,7 @@ export class AuthService {
         ...user,
         player: playerData,
         ownedClubs: user.clubs,
+        scorerInvitations,
       },
     };
   }

@@ -126,6 +126,20 @@ export class MatchService {
       throw new NotFoundException('One or both teams not found');
     }
 
+    const scorerId = createMatchDto.scorerId || userId;
+    if (scorerId !== userId) {
+      const scorer = await this.prisma.user.findFirst({
+        where: {
+          id: scorerId,
+          deletedAt: null,
+        },
+      });
+
+      if (!scorer) {
+        throw new NotFoundException('Scorer user not found');
+      }
+    }
+
     // Create match
     const match = await this.prisma.match.create({
       data: {
@@ -141,6 +155,7 @@ export class MatchService {
             : null,
         scheduledDate: new Date(createMatchDto.scheduledDate),
         status: MatchStatus.SCHEDULED,
+        scorerId,
         creatorId: userId,
       },
       include: {
@@ -155,51 +170,47 @@ export class MatchService {
     const invitationExpiresAt = new Date();
     invitationExpiresAt.setDate(invitationExpiresAt.getDate() + expiryDays);
 
-    // Check if auto-accept is enabled
-    const autoAccept = this.configService.get('invitations.autoAccept') || false;
-    const initialStatus = autoAccept ? InvitationStatus.ACCEPTED : InvitationStatus.PENDING;
+    const team1OwnerId = team1.club.ownerId ?? team1.club.owner?.id;
+    const team2OwnerId = team2.club.ownerId ?? team2.club.owner?.id;
+    const team1Status =
+      team1OwnerId === userId
+        ? InvitationStatus.ACCEPTED
+        : InvitationStatus.PENDING;
+    const team2Status =
+      team2OwnerId === userId
+        ? InvitationStatus.ACCEPTED
+        : InvitationStatus.PENDING;
 
     await this.prisma.matchInvitation.createMany({
       data: [
         {
           matchId: match.id,
           teamId: createMatchDto.team1Id,
-          status: initialStatus,
+          status: team1Status,
           invitationExpiresAt,
-          respondedAt: autoAccept ? new Date() : null,
+          respondedAt:
+            team1Status === InvitationStatus.ACCEPTED ? new Date() : null,
         },
         {
           matchId: match.id,
           teamId: createMatchDto.team2Id,
-          status: initialStatus,
+          status: team2Status,
           invitationExpiresAt,
-          respondedAt: autoAccept ? new Date() : null,
+          respondedAt:
+            team2Status === InvitationStatus.ACCEPTED ? new Date() : null,
         },
       ],
     });
 
-    // Send invitation emails only if not auto-accepting
-    if (!autoAccept) {
-      const frontendUrl = this.configService.get('app.frontendUrl') || '';
-      const matchDetails = `${team1.name} vs ${team2.name} on ${new Date(createMatchDto.scheduledDate).toLocaleDateString()}`;
-
-      // Send to team 1 club owner
-      await this.emailService.sendMatchInvitation(
-        team1.club.owner.email,
-        team1.name,
-        matchDetails,
-        `${frontendUrl}/matches/${match.id}`,
-        expiryDays,
-      );
-
-      // Send to team 2 club owner
-      await this.emailService.sendMatchInvitation(
-        team2.club.owner.email,
-        team2.name,
-        matchDetails,
-        `${frontendUrl}/matches/${match.id}`,
-        expiryDays,
-      );
+    if (scorerId !== userId) {
+      await this.prisma.matchScorerInvitation.create({
+        data: {
+          matchId: match.id,
+          scorerId,
+          status: InvitationStatus.PENDING,
+          invitationExpiresAt,
+        },
+      });
     }
 
     this.logger.info('Match created successfully', {
@@ -214,7 +225,7 @@ export class MatchService {
     };
   }
 
-  async findAll(tournamentId?: string) {
+  async findAll(userId: string, tournamentId?: string) {
     const where: any = {
       deletedAt: null,
     };
@@ -248,9 +259,69 @@ export class MatchService {
       },
     });
 
+    const createdMatches = await this.prisma.match.findMany({
+      where: {
+        ...where,
+        creatorId: userId,
+      },
+      select: {
+        id: true,
+        scheduledDate: true,
+        status: true,
+        team1: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+          },
+        },
+        team2: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+          },
+        },
+        scorer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        scorerInvitations: {
+          select: {
+            id: true,
+            matchId: true,
+            scorerId: true,
+            status: true,
+            invitedAt: true,
+            invitationExpiresAt: true,
+            respondedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            scorer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            invitedAt: 'desc',
+          },
+        },
+      },
+      orderBy: {
+        scheduledDate: 'desc',
+      },
+    });
+
     return {
       message: 'Matches retrieved successfully',
       data: matches,
+      createdMatches,
     };
   }
 
@@ -420,17 +491,43 @@ export class MatchService {
       );
     }
 
+    if (match.status !== MatchStatus.SCHEDULED) {
+      throw new BadRequestException(
+        'Scorer can only be changed before the match starts',
+      );
+    }
+
     // Check if scorer user exists
-    const scorer = await this.prisma.user.findUnique({
+    if (assignScorerDto.scorerId !== userId) {
+      const scorer = await this.prisma.user.findFirst({
+        where: {
+          id: assignScorerDto.scorerId,
+          deletedAt: null,
+        },
+      });
+
+      if (!scorer) {
+        throw new NotFoundException('Scorer user not found');
+      }
+    }
+
+    await this.prisma.matchScorerInvitation.updateMany({
       where: {
-        id: assignScorerDto.scorerId,
-        deletedAt: null,
+        matchId: id,
+        status: {
+          in: [InvitationStatus.PENDING, InvitationStatus.ACCEPTED],
+        },
+      },
+      data: {
+        status: InvitationStatus.WITHDRAWN,
+        respondedAt: new Date(),
       },
     });
 
-    if (!scorer) {
-      throw new NotFoundException('Scorer user not found');
-    }
+    const expiryDays =
+      this.configService.get('invitations.matchExpiryDays') || 3;
+    const invitationExpiresAt = new Date();
+    invitationExpiresAt.setDate(invitationExpiresAt.getDate() + expiryDays);
 
     // Update match
     const updatedMatch = await this.prisma.match.update({
@@ -439,6 +536,29 @@ export class MatchService {
         scorerId: assignScorerDto.scorerId,
       },
     });
+
+    if (assignScorerDto.scorerId !== userId) {
+      await this.prisma.matchScorerInvitation.upsert({
+        where: {
+          matchId_scorerId: {
+            matchId: id,
+            scorerId: assignScorerDto.scorerId,
+          },
+        },
+        update: {
+          status: InvitationStatus.PENDING,
+          invitedAt: new Date(),
+          invitationExpiresAt,
+          respondedAt: null,
+        },
+        create: {
+          matchId: id,
+          scorerId: assignScorerDto.scorerId,
+          status: InvitationStatus.PENDING,
+          invitationExpiresAt,
+        },
+      });
+    }
 
     this.logger.info('Scorer assigned to match', {
       matchId: id,
@@ -473,6 +593,26 @@ export class MatchService {
     // Check if match is in correct status
     if (match.status !== MatchStatus.SCHEDULED) {
       throw new BadRequestException('Match can only be started from SCHEDULED status');
+    }
+
+    if (!match.scorerId) {
+      throw new BadRequestException('Scorer must be assigned before starting the match');
+    }
+
+    if (match.scorerId !== match.creatorId) {
+      const scorerInvitation = await this.prisma.matchScorerInvitation.findFirst({
+        where: {
+          matchId: id,
+          scorerId: match.scorerId,
+          status: InvitationStatus.ACCEPTED,
+        },
+      });
+
+      if (!scorerInvitation) {
+        throw new BadRequestException(
+          'Scorer must accept the invitation before starting the match',
+        );
+      }
     }
 
     // Check if both teams have accepted invitations
@@ -594,6 +734,401 @@ export class MatchService {
     return {
       message: 'Match invitations retrieved successfully',
       data: invitations,
+    };
+  }
+
+  async getScorerInvitations(userId: string) {
+    const invitations = await this.prisma.matchScorerInvitation.findMany({
+      where: {
+        scorerId: userId,
+        status: InvitationStatus.PENDING,
+        invitationExpiresAt: {
+          gt: new Date(),
+        },
+      },
+      include: {
+        match: {
+          include: {
+            team1: true,
+            team2: true,
+            tournament: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        invitedAt: 'desc',
+      },
+    });
+
+    return {
+      message: 'Scorer invitations retrieved successfully',
+      data: invitations,
+    };
+  }
+
+  async getTeamInvitations(userId: string) {
+    const invitations = await this.prisma.matchInvitation.findMany({
+      where: {
+        status: InvitationStatus.PENDING,
+        invitationExpiresAt: {
+          gt: new Date(),
+        },
+        team: {
+          club: {
+            ownerId: userId,
+          },
+        },
+      },
+      include: {
+        team: {
+          select: {
+            id: true,
+            name: true,
+            logo: true,
+            clubId: true,
+          },
+        },
+        match: {
+          include: {
+            team1: {
+              select: {
+                id: true,
+                name: true,
+                logo: true,
+              },
+            },
+            team2: {
+              select: {
+                id: true,
+                name: true,
+                logo: true,
+              },
+            },
+            tournament: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        invitedAt: 'desc',
+      },
+    });
+
+    return {
+      message: 'Team invitations retrieved successfully',
+      data: invitations,
+    };
+  }
+
+  async getMyMatches(userId: string) {
+    const matchCardSelect = {
+      id: true,
+      scheduledDate: true,
+      status: true,
+      team1: {
+        select: {
+          id: true,
+          name: true,
+          logo: true,
+        },
+      },
+      team2: {
+        select: {
+          id: true,
+          name: true,
+          logo: true,
+        },
+      },
+      scorer: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    };
+
+    const [player, ownedTeams] = await Promise.all([
+      this.prisma.player.findUnique({
+        where: { userId },
+        select: {
+          id: true,
+          teamMemberships: {
+            where: { status: InvitationStatus.ACCEPTED },
+            select: { teamId: true },
+          },
+        },
+      }),
+      this.prisma.team.findMany({
+        where: {
+          deletedAt: null,
+          club: {
+            ownerId: userId,
+          },
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    const teamIds = player?.teamMemberships.map((m) => m.teamId) ?? [];
+    const ownedTeamIds = ownedTeams.map((team) => team.id);
+
+    const [
+      createdMatches,
+      scorerMatches,
+      teamMatches,
+      ownerTeamMatches,
+      teamInvitations,
+      scorerInvitations,
+    ] = await Promise.all([
+        this.prisma.match.findMany({
+          where: {
+            creatorId: userId,
+            deletedAt: null,
+          },
+          select: {
+            ...matchCardSelect,
+            scorerInvitations: {
+              select: {
+                id: true,
+                matchId: true,
+                scorerId: true,
+                status: true,
+                invitedAt: true,
+                invitationExpiresAt: true,
+                respondedAt: true,
+                createdAt: true,
+                updatedAt: true,
+                scorer: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+              orderBy: {
+                invitedAt: 'desc',
+              },
+            },
+          },
+          orderBy: {
+            scheduledDate: 'desc',
+          },
+        }),
+        this.prisma.match.findMany({
+          where: {
+            scorerId: userId,
+            deletedAt: null,
+          },
+          select: matchCardSelect,
+          orderBy: {
+            scheduledDate: 'desc',
+          },
+        }),
+        teamIds.length
+          ? this.prisma.match.findMany({
+              where: {
+                deletedAt: null,
+                invitations: {
+                  some: {
+                    teamId: { in: teamIds },
+                    status: InvitationStatus.ACCEPTED,
+                  },
+                },
+              },
+              select: matchCardSelect,
+              orderBy: {
+                scheduledDate: 'desc',
+              },
+            })
+          : Promise.resolve([]),
+        ownedTeamIds.length
+          ? this.prisma.match.findMany({
+              where: {
+                deletedAt: null,
+                invitations: {
+                  some: {
+                    teamId: { in: ownedTeamIds },
+                    status: InvitationStatus.ACCEPTED,
+                  },
+                },
+              },
+              select: matchCardSelect,
+              orderBy: {
+                scheduledDate: 'desc',
+              },
+            })
+          : Promise.resolve([]),
+        this.prisma.matchInvitation.findMany({
+          where: {
+            status: InvitationStatus.PENDING,
+            invitationExpiresAt: {
+              gt: new Date(),
+            },
+            team: {
+              club: {
+                ownerId: userId,
+              },
+            },
+          },
+          include: {
+            team: {
+              select: {
+                id: true,
+                name: true,
+                logo: true,
+                clubId: true,
+              },
+            },
+            match: {
+              select: matchCardSelect,
+            },
+          },
+          orderBy: {
+            invitedAt: 'desc',
+          },
+        }),
+        this.prisma.matchScorerInvitation.findMany({
+          where: {
+            scorerId: userId,
+            status: InvitationStatus.PENDING,
+            invitationExpiresAt: {
+              gt: new Date(),
+            },
+          },
+          include: {
+            match: {
+              select: matchCardSelect,
+            },
+          },
+          orderBy: {
+            invitedAt: 'desc',
+          },
+        }),
+      ]);
+
+    return {
+      message: 'My matches retrieved successfully',
+      data: {
+        createdMatches,
+        scorerMatches,
+        teamMatches,
+        ownerTeamMatches,
+        teamInvitations,
+        scorerInvitations,
+      },
+    };
+  }
+
+  async acceptScorerInvitation(invitationId: string, userId: string) {
+    const invitation = await this.prisma.matchScorerInvitation.findFirst({
+      where: {
+        id: invitationId,
+        status: InvitationStatus.PENDING,
+        invitationExpiresAt: {
+          gt: new Date(),
+        },
+      },
+      include: {
+        match: true,
+      },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found or has expired');
+    }
+
+    if (invitation.scorerId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to accept this invitation',
+      );
+    }
+
+    if (invitation.match.status !== MatchStatus.SCHEDULED) {
+      throw new BadRequestException(
+        'Scorer invitation can only be accepted before the match starts',
+      );
+    }
+
+    const updatedInvitation = await this.prisma.matchScorerInvitation.update({
+      where: { id: invitationId },
+      data: {
+        status: InvitationStatus.ACCEPTED,
+        respondedAt: new Date(),
+      },
+    });
+
+    this.logger.info('Scorer invitation accepted', {
+      invitationId,
+      matchId: invitation.matchId,
+      scorerId: invitation.scorerId,
+      context: MatchService.name,
+    });
+
+    return {
+      message: 'Invitation accepted successfully',
+      data: updatedInvitation,
+    };
+  }
+
+  async rejectScorerInvitation(invitationId: string, userId: string) {
+    const invitation = await this.prisma.matchScorerInvitation.findFirst({
+      where: {
+        id: invitationId,
+        status: InvitationStatus.PENDING,
+        invitationExpiresAt: {
+          gt: new Date(),
+        },
+      },
+      include: {
+        match: true,
+      },
+    });
+
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found or has expired');
+    }
+
+    if (invitation.scorerId !== userId) {
+      throw new ForbiddenException(
+        'You do not have permission to reject this invitation',
+      );
+    }
+
+    if (invitation.match.status !== MatchStatus.SCHEDULED) {
+      throw new BadRequestException(
+        'Scorer invitation can only be rejected before the match starts',
+      );
+    }
+
+    const updatedInvitation = await this.prisma.matchScorerInvitation.update({
+      where: { id: invitationId },
+      data: {
+        status: InvitationStatus.REJECTED,
+        respondedAt: new Date(),
+      },
+    });
+
+    this.logger.info('Scorer invitation rejected', {
+      invitationId,
+      matchId: invitation.matchId,
+      scorerId: invitation.scorerId,
+      context: MatchService.name,
+    });
+
+    return {
+      message: 'Invitation rejected successfully',
+      data: updatedInvitation,
     };
   }
 

@@ -33,10 +33,50 @@ export class MatchController {
     return this.matchService.create(user.id, createMatchDto);
   }
 
+  @Get('scorer-invitations')
+  @UseGuards(JwtAuthGuard)
+  async getScorerInvitations(@CurrentUser() user: any) {
+    return this.matchService.getScorerInvitations(user.id);
+  }
+
+  @Get('team-invitations')
+  @UseGuards(JwtAuthGuard)
+  async getTeamInvitations(@CurrentUser() user: any) {
+    return this.matchService.getTeamInvitations(user.id);
+  }
+
+  @Get('my-matches')
+  @UseGuards(JwtAuthGuard)
+  async getMyMatches(@CurrentUser() user: any) {
+    return this.matchService.getMyMatches(user.id);
+  }
+
+  @Post('scorer-invitations/:invitationId/accept')
+  @UseGuards(JwtAuthGuard)
+  async acceptScorerInvitation(
+    @Param('invitationId') invitationId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.matchService.acceptScorerInvitation(invitationId, user.id);
+  }
+
+  @Post('scorer-invitations/:invitationId/reject')
+  @UseGuards(JwtAuthGuard)
+  async rejectScorerInvitation(
+    @Param('invitationId') invitationId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.matchService.rejectScorerInvitation(invitationId, user.id);
+  }
+
   @Get()
   @Serialize(MatchResponseDto)
-  async findAll(@Query('tournamentId') tournamentId?: string) {
-    return this.matchService.findAll(tournamentId);
+  @UseGuards(JwtAuthGuard)
+  async findAll(
+    @CurrentUser() user: any,
+    @Query('tournamentId') tournamentId?: string,
+  ) {
+    return this.matchService.findAll(user.id, tournamentId);
   }
 
   @Get(':id')

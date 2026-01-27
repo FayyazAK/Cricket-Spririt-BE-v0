@@ -39,8 +39,12 @@ All authentication endpoints are prefixed with `/auth`
 14. [Update Player](#14-update-player)
 15. [Deactivate Player](#15-deactivate-player)
 
-16. [Error Responses](#error-responses)
-17. [Enums Reference](#enums-reference)
+### Match Management
+16. [Match Flow Overview](#16-match-management)
+17. [Match Endpoints](#17-match-endpoints)
+
+18. [Error Responses](#error-responses)
+19. [Enums Reference](#enums-reference)
 
 ---
 
@@ -547,7 +551,9 @@ Authorization: Bearer <accessToken>
     "createdAt": "2026-01-11T13:25:00.000Z",
     "updatedAt": "2026-01-11T13:25:00.000Z",
     "deletedAt": null,
-    "player": null
+    "player": null,
+    "ownedClubs": [],
+    "scorerInvitations": []
   }
 }
 ```
@@ -593,7 +599,51 @@ Authorization: Bearer <accessToken>
       ],
       "createdAt": "2026-01-11T14:00:00.000Z",
       "updatedAt": "2026-01-11T14:00:00.000Z"
-    }
+    },
+    "ownedClubs": [
+      {
+        "id": "club-uuid",
+        "name": "Mumbai Strikers",
+        "profilePicture": "http://localhost:3000/uploads/logos/club.png",
+        "address": {
+          "city": "Mumbai",
+          "state": "Maharashtra",
+          "country": "India",
+          "postalCode": "400053"
+        }
+      }
+    ],
+    "scorerInvitations": [
+      {
+        "id": "invitation-uuid",
+        "matchId": "match-uuid",
+        "scorerId": "user-uuid",
+        "status": "PENDING",
+        "invitedAt": "2026-01-26T10:00:00.000Z",
+        "invitationExpiresAt": "2026-01-27T10:00:00.000Z",
+        "respondedAt": null,
+        "createdAt": "2026-01-26T10:00:00.000Z",
+        "updatedAt": "2026-01-26T10:00:00.000Z",
+        "match": {
+          "team1": {
+            "id": "team-1-uuid",
+            "name": "Team One",
+            "logo": "http://localhost:3000/uploads/logos/team1.png",
+            "clubId": "club-uuid"
+          },
+          "team2": {
+            "id": "team-2-uuid",
+            "name": "Team Two",
+            "logo": "http://localhost:3000/uploads/logos/team2.png",
+            "clubId": "club-uuid"
+          },
+          "tournament": {
+            "id": "tournament-uuid",
+            "name": "Winter League 2026"
+          }
+        }
+      }
+    ]
   }
 }
 ```
@@ -1120,6 +1170,472 @@ Authorization: Bearer <accessToken>
   "statusCode": 404,
   "message": "Player not found"
 }
+```
+
+---
+
+## 16. Match Management
+
+This section covers the end-to-end flow for creating and starting a match, including team and scorer invitations.
+
+### Flow Overview
+1. **Create match** via `POST /api/v1/matches`.
+   - `scorerId` is optional. If omitted, the match creator becomes the scorer.
+   - If `scorerId` is a different user, a **scorer invitation** is created (in-app).
+2. **Team invitations** are created for both teams. Team owners must accept.
+3. **Scorer invitation** (if applicable) must be accepted by the scorer.
+4. **Start match** via `POST /api/v1/matches/:id/start`.
+   - Only the assigned scorer can start.
+   - Both team invitations must be accepted.
+   - If scorer is not the creator, scorer must accept invitation.
+5. **Record toss** via `POST /api/v1/matches/:id/toss` to move match to `IN_PROGRESS`.
+
+### Key Rules
+- Scorer can be reassigned **only while match status is `SCHEDULED`**.
+- If creator reassigns scoring to themselves, **no scorer invite is created**.
+- If another scorer is assigned, creator can reassign any time before start (old invites are withdrawn).
+- Match cannot start until **both teams** and **scorer (if not creator)** accept invitations.
+
+---
+
+## 17. Match Endpoints
+
+### Create Match
+```
+POST /api/v1/matches
+Authorization: Bearer <accessToken>
+```
+
+#### Request Body
+```json
+{
+  "tournamentId": "uuid (optional)",
+  "scorerId": "uuid (optional, defaults to creator)",
+  "team1Id": "uuid (required)",
+  "team2Id": "uuid (required)",
+  "overs": 20,
+  "ballType": "LEATHER | TENNIS_TAPE",
+  "format": "T20 | ODI | TEST | CUSTOM",
+  "customOvers": 15,
+  "scheduledDate": "2026-01-30T10:00:00.000Z"
+}
+```
+
+#### Success Response (201)
+```json
+{
+  "message": "Match created successfully",
+  "data": {
+    "id": "match-uuid",
+    "team1": { "id": "team-1", "name": "Team A" },
+    "team2": { "id": "team-2", "name": "Team B" },
+    "scorerId": "user-uuid",
+    "status": "SCHEDULED"
+  }
+}
+```
+
+---
+
+### Assign/Reassign Scorer
+```
+POST /api/v1/matches/:id/scorer
+Authorization: Bearer <accessToken>
+```
+
+#### Request Body
+```json
+{
+  "scorerId": "uuid"
+}
+```
+
+#### Notes
+- Only the **match creator** can assign/reassign.
+- Works **only before start** (`SCHEDULED`).
+- If `scorerId` is not the creator, a scorer invitation is created.
+- Team and scorer invitations are **in-app only** (no email is sent).
+- Team invitations are **auto-accepted** for teams owned by the creator; others remain **PENDING**.
+
+---
+
+### Get Match Invitations (Teams)
+```
+GET /api/v1/matches/:id/invitations
+Authorization: Bearer <accessToken>
+```
+
+---
+
+### Get Team Invitations (For Club Owners)
+```
+GET /api/v1/matches/team-invitations
+Authorization: Bearer <accessToken>
+```
+
+#### Success Response (200 OK)
+```json
+{
+  "message": "Team invitations retrieved successfully",
+  "data": [
+    {
+      "id": "invitation-uuid",
+      "matchId": "match-uuid",
+      "teamId": "team-uuid",
+      "status": "PENDING",
+      "invitedAt": "2026-01-26T10:00:00.000Z",
+      "invitationExpiresAt": "2026-01-27T10:00:00.000Z",
+      "respondedAt": null,
+      "createdAt": "2026-01-26T10:00:00.000Z",
+      "updatedAt": "2026-01-26T10:00:00.000Z",
+      "team": {
+        "id": "team-uuid",
+        "name": "Team One",
+        "logo": "http://localhost:3000/uploads/logos/team1.png",
+        "clubId": "club-uuid"
+      },
+      "match": {
+        "team1": {
+          "id": "team-1-uuid",
+          "name": "Team One",
+          "logo": "http://localhost:3000/uploads/logos/team1.png"
+        },
+        "team2": {
+          "id": "team-2-uuid",
+          "name": "Team Two",
+          "logo": "http://localhost:3000/uploads/logos/team2.png"
+        },
+        "tournament": {
+          "id": "tournament-uuid",
+          "name": "Winter League 2026"
+        }
+      }
+    }
+  ]
+}
+```
+
+---
+
+### Get My Matches (Organized)
+```
+GET /api/v1/matches/my-matches
+Authorization: Bearer <accessToken>
+```
+
+#### Success Response (200 OK)
+```json
+{
+  "message": "My matches retrieved successfully",
+  "data": {
+    "createdMatches": [
+      {
+        "id": "match-uuid",
+        "scheduledDate": "2026-01-26T10:00:00.000Z",
+        "status": "SCHEDULED",
+        "team1": { "id": "team-1-uuid", "name": "Team One", "logo": "..." },
+        "team2": { "id": "team-2-uuid", "name": "Team Two", "logo": "..." },
+        "scorer": { "id": "user-uuid", "name": "John Doe", "email": "john.doe@example.com" },
+        "scorerInvitations": [
+          {
+            "id": "invitation-uuid",
+            "matchId": "match-uuid",
+            "scorerId": "user-uuid",
+            "status": "PENDING",
+            "invitedAt": "2026-01-26T10:00:00.000Z",
+            "invitationExpiresAt": "2026-01-27T10:00:00.000Z",
+            "respondedAt": null,
+            "createdAt": "2026-01-26T10:00:00.000Z",
+            "updatedAt": "2026-01-26T10:00:00.000Z",
+            "scorer": { "id": "user-uuid", "name": "John Doe", "email": "john.doe@example.com" }
+          }
+        ]
+      }
+    ],
+    "scorerMatches": [
+      {
+        "id": "match-uuid",
+        "scheduledDate": "2026-01-26T10:00:00.000Z",
+        "status": "SCHEDULED",
+        "team1": { "id": "team-1-uuid", "name": "Team One", "logo": "..." },
+        "team2": { "id": "team-2-uuid", "name": "Team Two", "logo": "..." },
+        "scorer": { "id": "user-uuid", "name": "John Doe", "email": "john.doe@example.com" }
+      }
+    ],
+    "teamMatches": [
+      {
+        "id": "match-uuid",
+        "scheduledDate": "2026-01-26T10:00:00.000Z",
+        "status": "SCHEDULED",
+        "team1": { "id": "team-1-uuid", "name": "Team One", "logo": "..." },
+        "team2": { "id": "team-2-uuid", "name": "Team Two", "logo": "..." },
+        "scorer": { "id": "user-uuid", "name": "John Doe", "email": "john.doe@example.com" }
+      }
+    ],
+    "ownerTeamMatches": [
+      {
+        "id": "match-uuid",
+        "scheduledDate": "2026-01-26T10:00:00.000Z",
+        "status": "SCHEDULED",
+        "team1": { "id": "team-1-uuid", "name": "Team One", "logo": "..." },
+        "team2": { "id": "team-2-uuid", "name": "Team Two", "logo": "..." },
+        "scorer": { "id": "user-uuid", "name": "John Doe", "email": "john.doe@example.com" }
+      }
+    ],
+    "teamInvitations": [
+      {
+        "id": "invitation-uuid",
+        "matchId": "match-uuid",
+        "teamId": "team-uuid",
+        "status": "PENDING",
+        "invitedAt": "2026-01-26T10:00:00.000Z",
+        "invitationExpiresAt": "2026-01-27T10:00:00.000Z",
+        "respondedAt": null,
+        "createdAt": "2026-01-26T10:00:00.000Z",
+        "updatedAt": "2026-01-26T10:00:00.000Z",
+        "team": { "id": "team-uuid", "name": "Team One", "logo": "...", "clubId": "club-uuid" },
+        "match": {
+          "id": "match-uuid",
+          "scheduledDate": "2026-01-26T10:00:00.000Z",
+          "status": "SCHEDULED",
+          "team1": { "id": "team-1-uuid", "name": "Team One", "logo": "..." },
+          "team2": { "id": "team-2-uuid", "name": "Team Two", "logo": "..." },
+          "scorer": { "id": "user-uuid", "name": "John Doe", "email": "john.doe@example.com" }
+        }
+      }
+    ],
+    "scorerInvitations": [
+      {
+        "id": "invitation-uuid",
+        "matchId": "match-uuid",
+        "scorerId": "user-uuid",
+        "status": "PENDING",
+        "invitedAt": "2026-01-26T10:00:00.000Z",
+        "invitationExpiresAt": "2026-01-27T10:00:00.000Z",
+        "respondedAt": null,
+        "createdAt": "2026-01-26T10:00:00.000Z",
+        "updatedAt": "2026-01-26T10:00:00.000Z",
+        "match": {
+          "id": "match-uuid",
+          "scheduledDate": "2026-01-26T10:00:00.000Z",
+          "status": "SCHEDULED",
+          "team1": { "id": "team-1-uuid", "name": "Team One", "logo": "..." },
+          "team2": { "id": "team-2-uuid", "name": "Team Two", "logo": "..." },
+          "scorer": { "id": "user-uuid", "name": "John Doe", "email": "john.doe@example.com" }
+        }
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Accept Team Invitation
+```
+POST /api/v1/matches/invitations/:invitationId/accept
+Authorization: Bearer <accessToken>
+```
+
+---
+
+### Reject Team Invitation
+```
+POST /api/v1/matches/invitations/:invitationId/reject
+Authorization: Bearer <accessToken>
+```
+
+---
+
+### Get Scorer Invitations (In-app)
+```
+GET /api/v1/matches/scorer-invitations
+Authorization: Bearer <accessToken>
+```
+
+#### Success Response (200 OK)
+```json
+{
+  "message": "Scorer invitations retrieved successfully",
+  "data": [
+    {
+      "id": "invitation-uuid",
+      "matchId": "match-uuid",
+      "scorerId": "user-uuid",
+      "status": "PENDING",
+      "invitedAt": "2026-01-26T10:00:00.000Z",
+      "invitationExpiresAt": "2026-01-27T10:00:00.000Z",
+      "respondedAt": null,
+      "createdAt": "2026-01-26T10:00:00.000Z",
+      "updatedAt": "2026-01-26T10:00:00.000Z",
+      "match": {
+        "team1": {
+          "id": "team-1-uuid",
+          "name": "Team One",
+          "logo": "http://localhost:3000/uploads/logos/team1.png",
+          "clubId": "club-uuid"
+        },
+        "team2": {
+          "id": "team-2-uuid",
+          "name": "Team Two",
+          "logo": "http://localhost:3000/uploads/logos/team2.png",
+          "clubId": "club-uuid"
+        },
+        "tournament": {
+          "id": "tournament-uuid",
+          "name": "Winter League 2026"
+        }
+      }
+    }
+  ]
+}
+```
+
+---
+
+### Accept Scorer Invitation
+```
+POST /api/v1/matches/scorer-invitations/:invitationId/accept
+Authorization: Bearer <accessToken>
+```
+
+---
+
+### Reject Scorer Invitation
+```
+POST /api/v1/matches/scorer-invitations/:invitationId/reject
+Authorization: Bearer <accessToken>
+```
+
+---
+
+### Start Match
+```
+POST /api/v1/matches/:id/start
+Authorization: Bearer <accessToken>
+```
+
+#### Notes
+- Only assigned scorer can start.
+- Requires team invitations accepted.
+- Requires scorer invitation accepted if scorer is not creator.
+
+---
+
+### Record Toss
+```
+POST /api/v1/matches/:id/toss
+Authorization: Bearer <accessToken>
+```
+
+#### Request Body
+```json
+{
+  "tossWinnerId": "team-uuid",
+  "tossDecision": "BAT | FIELD"
+}
+```
+
+---
+
+### Get Match Result
+```
+GET /api/v1/matches/:id/result
+```
+
+---
+
+### Get Matches
+```
+GET /api/v1/matches
+Authorization: Bearer <accessToken>
+```
+
+#### Optional Query Params
+```
+tournamentId=<tournament-uuid>
+```
+
+#### Success Response (200 OK)
+```json
+{
+  "message": "Matches retrieved successfully",
+  "data": [
+    {
+      "id": "match-uuid",
+      "tournamentId": "tournament-uuid",
+      "team1": {
+        "id": "team-1-uuid",
+        "name": "Team One",
+        "logo": "http://localhost:3000/uploads/logos/team1.png"
+      },
+      "team2": {
+        "id": "team-2-uuid",
+        "name": "Team Two",
+        "logo": "http://localhost:3000/uploads/logos/team2.png"
+      },
+      "overs": 20,
+      "ballType": "TENNIS",
+      "format": "T20",
+      "customOvers": null,
+      "status": "SCHEDULED",
+      "scheduledDate": "2026-01-26T10:00:00.000Z",
+      "startedAt": null,
+      "completedAt": null,
+      "createdAt": "2026-01-26T09:00:00.000Z",
+      "updatedAt": "2026-01-26T09:00:00.000Z"
+    }
+  ],
+  "createdMatches": [
+    {
+      "id": "match-uuid",
+      "scheduledDate": "2026-01-26T10:00:00.000Z",
+      "status": "SCHEDULED",
+      "team1": {
+        "id": "team-1-uuid",
+        "name": "Team One",
+        "logo": "http://localhost:3000/uploads/logos/team1.png"
+      },
+      "team2": {
+        "id": "team-2-uuid",
+        "name": "Team Two",
+        "logo": "http://localhost:3000/uploads/logos/team2.png"
+      },
+      "scorer": {
+        "id": "user-uuid",
+        "name": "John Doe",
+        "email": "john.doe@example.com"
+      },
+      "scorerInvitations": [
+        {
+          "id": "invitation-uuid",
+          "matchId": "match-uuid",
+          "scorerId": "user-uuid",
+          "status": "PENDING",
+          "invitedAt": "2026-01-26T10:00:00.000Z",
+          "invitationExpiresAt": "2026-01-27T10:00:00.000Z",
+          "respondedAt": null,
+          "createdAt": "2026-01-26T10:00:00.000Z",
+          "updatedAt": "2026-01-26T10:00:00.000Z",
+          "scorer": {
+            "id": "user-uuid",
+            "name": "John Doe",
+            "email": "john.doe@example.com"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### Other Match Endpoints
+```
+GET /api/v1/matches/:id
+PUT /api/v1/matches/:id
+DELETE /api/v1/matches/:id
 ```
 
 ---
@@ -1829,6 +2345,6 @@ For any issues or questions regarding the API, please contact the backend team o
 
 ---
 
-**Last Updated:** January 11, 2026  
+**Last Updated:** January 23, 2026  
 **API Version:** 1.0.0  
 **Base URL:** `http://localhost:3000/api/v1`

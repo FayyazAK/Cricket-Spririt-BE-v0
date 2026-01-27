@@ -43,6 +43,32 @@ export class UserService {
     return users;
   }
 
+  async searchByEmail(email: string) {
+    if (!email?.trim()) {
+      throw new BadRequestException('Email query is required');
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        email: {
+          contains: email.trim(),
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      take: 20,
+    });
+
+    return users;
+  }
+
   async create(createUserDto: CreateUserDto) {
     this.logger.info('Creating new user', {
       email: createUserDto.email,
